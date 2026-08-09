@@ -671,9 +671,29 @@ https://github.com/willwefind/shiju
 
 面板、纸、字、墨、版式全都一样，就是那一套。
 
-> 📄 **随仓的 20 套信纸也跟着进来了。** 酒馆是把整个仓库 clone 到本地的，
-> 所以那个素材包就在扩展目录里（`.../extensions/shiju/papers/letterpaper-20sets.pack.json`），
-> 面板 → 纸 → **＋包** → 选它就行，不用再去下载。
+### 📄 随仓那 20 套信纸也跟着进来了 —— 但你得知道它在哪
+
+酒馆是把**整个仓库** clone 到本地的，所以那个素材包已经在你硬盘上了，不用再去下载。
+
+面板 → **纸** → **＋包** → 选这个文件：
+
+```
+SillyTavern\data\default-user\extensions\shiju\papers\letterpaper-20sets.pack.json
+```
+
+> 上面是**默认情况**（装的时候没勾「global / 给所有用户装」）。
+> `default-user` 是酒馆默认的用户名，你要是建过别的用户就换成那个。
+>
+> **勾了 global 装的**，在另一处：
+> `SillyTavern\public\scripts\extensions\third-party\shiju\papers\letterpaper-20sets.pack.json`
+>
+> 两处都找不到就在 SillyTavern 文件夹里搜文件名 **`letterpaper-20sets`**。
+
+💡 **文件选择框里翻目录很麻烦，直接把上面那行整段粘进「文件名」那一栏，回车就行。**
+
+> ⚠️ **别装两遍。** 装的时候勾了 global、又装了一次普通的，硬盘上就会有两份仓库
+> （每份约 9MB）。功能上不打架（酒馆按名字去重，只加载一份），
+> 但更新的时候容易只更到其中一份。留一份就好，另一份整个文件夹删掉。
 
 ### 装了扩展，会影响它在别的网页上用吗？
 
