@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.5
+// @version      0.16.7
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
@@ -39,7 +39,7 @@ if (document.documentElement.dataset[MARK]) {
     document.documentElement.dataset[MARK] + '），这一份让开。');
   return;
 }
-document.documentElement.dataset[MARK] = '0.16.5';
+document.documentElement.dataset[MARK] = '0.16.7';
 
 // ════════════════════════════════════════════════════════════════════
 //  0. 设置（GM 存储是跨网站共享的 —— 换纸换字设一次，全网通用）
@@ -63,6 +63,9 @@ const DEF = {
   vertical: false,      // 竖排：字从上往下，列从右往左
   offsetX: 0, offsetY: 0,   // 整块位移（在预览图上拖出来的）
   metaInk: 'auto',      // 题头/出处/日期/线的颜色。auto = 跟着纸深浅自动定
+  // 引号里那段话的颜色。auto = 跟着纸深浅自动定（原来的橙）；same = 跟正文一个色
+  // （＝不给引号变色）；也可以指定任何一支墨或直接一个 #rrggbb。
+  quoteInk: 'auto',
   presets: [],          // [{id,name,style}] 存下来的版式
   headRule: true,       // 题头下那道线
   titleRule: true,      // 标题下那道短横
@@ -173,7 +176,7 @@ const bestInk = mean => allInks().reduce((best, i) =>
   contrast(hex2rgb(i.c), mean) > contrast(hex2rgb(best.c), mean) ? i : best, INKS[0]);
 
 // 一套「版式」＝下面这些键（纸、字、色、排版全在内）。内容（正文/出处/日期）不在里面 —— 换版式不该动已经写好的字。
-const STYLE_KEYS = ['paper','font','latinFont','fontSize','ink','metaInk','orient','pages',
+const STYLE_KEYS = ['paper','font','latinFont','fontSize','ink','metaInk','quoteInk','orient','pages',
                     'weight','titleFont','titleSize','titleWeight','inkLight','paperLight',
                     'align','titleAlign','vertical','offsetX','offsetY',
                     'headText','showHeader','showSource','showDate',
@@ -182,19 +185,19 @@ const STYLE_KEYS = ['paper','font','latinFont','fontSize','ink','metaInk','orien
 const BUILTIN_PRESETS = [
   { id:'p_zhai', name:'摘录', style:{ headText:'摘 录', showHeader:true, showSource:true, showDate:true,
       align:'left', titleAlign:'center', vertical:false, orient:'portrait', paper:'rice',
-      ink:'black', metaInk:'auto', fontSize:46, titleSize:69, titleWeight:1, weight:0,
+      ink:'black', metaInk:'auto', quoteInk:'auto', fontSize:46, titleSize:69, titleWeight:1, weight:0,
       offsetX:0, offsetY:0 } },
   { id:'p_riji', name:'日记', style:{ headText:'日 记', showHeader:true, showSource:false, showDate:true,
       align:'left', titleAlign:'left', vertical:false, orient:'portrait', paper:'cream',
-      ink:'sepia', metaInk:'auto', fontSize:44, titleSize:57, titleWeight:0, weight:1,
+      ink:'sepia', metaInk:'auto', quoteInk:'auto', fontSize:44, titleSize:57, titleWeight:0, weight:1,
       offsetX:0, offsetY:0 } },
   { id:'p_xin',  name:'信件', style:{ headText:'', showHeader:false, showSource:true, showDate:true,
       align:'left', titleAlign:'left', vertical:false, orient:'portrait', paper:'linen',
-      ink:'indigo', metaInk:'auto', fontSize:42, titleSize:59, titleWeight:0, weight:0,
+      ink:'indigo', metaInk:'auto', quoteInk:'auto', fontSize:42, titleSize:59, titleWeight:0, weight:0,
       offsetX:0, offsetY:0 } },
   { id:'p_shu',  name:'竖排', style:{ headText:'', showHeader:false, showSource:true, showDate:true,
       align:'left', titleAlign:'center', vertical:true, orient:'portrait', paper:'rice',
-      ink:'black', metaInk:'auto', fontSize:44, titleSize:66, titleWeight:0, weight:0,
+      ink:'black', metaInk:'auto', quoteInk:'auto', fontSize:44, titleSize:66, titleWeight:0, weight:0,
       offsetX:0, offsetY:0 } },
 ];
 
@@ -365,6 +368,14 @@ const PLATFORM = {
 };
 // 加载这份脚本之前先塞一个 globalThis.__shijuPlatform，就能整体替换掉上面两件
 try { if (globalThis.__shijuPlatform) Object.assign(PLATFORM, globalThis.__shijuPlatform); } catch {}
+
+// 量具：排版全程只要「量一段字有多宽」这一件能力。
+// 排版那几个函数（planPages / chrome / titleBlock / wrapVertical）都收一个可选的
+// 量具工厂，不自己去造画布 —— 这样核心离「一个不碰环境的纯排版模块」只差搬家。
+// 🔑 工厂可以每次给新的，也可以每次都返回同一块（省着用）：调用链上每个用量具的
+//    地方都会**先设 font 再量**，所以共用一块是安全的。planPages 里 probe.font
+//    特意设在 chrome() 之后，就是为了共用时不被 chrome 改掉的 font 坑到。
+const newMeasure = () => PLATFORM.canvas().getContext('2d');
 
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 
@@ -565,8 +576,27 @@ function wrap(ctx, str, width, track){
 // 同色的连续一段一次画完，而不是一个字一个字画 ——
 // 逐字画会把西文的字距调整（kerning）全丢掉，接了西文字体后一眼就看得出松散。
 // 只在引号变色的地方断开。
-function drawRich(ctx, x, y, line, inkColor, quoteColor, stroke){
-  let depth = 0, run = '', runCol = inkColor;
+// 一段字走完之后，引号还剩几层没闭合。折行/翻页时用它把深度接上。
+const Q_OPEN = '「『“', Q_CLOSE = '」』”';
+function quoteDepthAfter(str, d = 0){
+  for (const ch of str){
+    if (Q_OPEN.includes(ch)) d++;
+    else if (Q_CLOSE.includes(ch)) d = Math.max(0, d - 1);
+  }
+  return d;
+}
+// 翻到第 idx 页时，正文的引号深度应该是多少（段间空档归零）
+function quoteDepthAtPage(pages, idx){
+  let d = 0;
+  for (let p = 0; p < idx; p++)
+    for (const it of pages[p]) d = it.gap ? 0 : quoteDepthAfter(it.text, d);
+  return d;
+}
+// 🔴 depth0：一段引号常常跨行（甚至跨页）。早先 depth 每行从 0 起，
+//    于是「一句话说到第二行就变回墨色」—— 颜色在折行处断掉，看着像坏了。
+//    现在由调用方把上一行结束时的深度传进来。
+function drawRich(ctx, x, y, line, inkColor, quoteColor, stroke, depth0 = 0){
+  let depth = depth0, run = '', runCol = depth0 > 0 ? quoteColor : inkColor;
   const flush = () => {
     if (!run) return;
     ctx.fillStyle = runCol;
@@ -620,8 +650,8 @@ function vAdvance(ctx, col, size){
 }
 
 // colH 是像素高度，不是格子数
-function wrapVertical(str, size, colH, ctx){
-  if (!ctx){ const c = PLATFORM.canvas().getContext('2d'); c.font = `${size}px serif`; ctx = c; }
+function wrapVertical(str, size, colH, ctx, mk){
+  if (!ctx){ const c = (mk || newMeasure)(); c.font = `${size}px serif`; ctx = c; }
   const cols = [];
   let cur = '';
   for (let tok of tokenize(str)){
@@ -637,8 +667,8 @@ function wrapVertical(str, size, colH, ctx){
 }
 
 // 画一列竖排的字。返回这一列实际用掉的高度。
-function drawColumn(ctx, x, y, col, size, inkColor, quoteColor, stroke){
-  let depth = 0, cy = y;
+function drawColumn(ctx, x, y, col, size, inkColor, quoteColor, stroke, depth0 = 0){
+  let depth = depth0, cy = y;
   let i = 0;
   while (i < col.length){
     const ch = col[i];
@@ -765,12 +795,12 @@ const titleFontSize = st => Math.max(12, Math.min(300, Math.round(st.titleSize |
 
 // 标题排好之后占多高。只印第一页，但**每页都按它预留**——
 // 各页版心一样高，正文垂直居中才对得齐，也绝不会溢出。
-function titleBlock(st, COL, availH){
+function titleBlock(st, COL, availH, mk){
   const t = (st.title || '').trim();
   if (!t) return { lines: [], h: 0, w: 0, size: 0, lh: 0, vertical: false };
   const size = titleFontSize(st);
   const lh = Math.round(size * 1.42);
-  const ctx = PLATFORM.canvas().getContext('2d');
+  const ctx = (mk || newMeasure)();
   // 🔴 latinFont 必须显式从 st 传：不传的话 fontStack 会去读存储里的配置，
   //    当前状态被无声忽略 —— 会变成「选了西文字体却没反应」。
   ctx.font = `${size}px ${titleStack(st)}`;
@@ -793,12 +823,12 @@ const HEAD_SZ = 22, SRC_SZ = 26, DATE_SZ = 21;
 
 // 题头和出处都不限字数，所以它们的占位必须按**实际折出来多少行/多少列**算，
 // 不能写死。写死的后果是字一长就冲出版心。
-function chrome(st, COL, availH){
-  const tb = titleBlock(st, COL, availH);
+function chrome(st, COL, availH, mk){
+  const tb = titleBlock(st, COL, availH, mk);
   const head = st.showHeader ? (st.headText || '').trim() : '';
   const src  = st.showSource ? (st.source || '').trim() : '';
   const date = st.showDate ? (st.date || '').trim() : '';
-  const ctx = PLATFORM.canvas().getContext('2d');
+  const ctx = (mk || newMeasure)();
   const stack = fontStack(st.font, st.latinFont);
 
   if (st.vertical){
@@ -831,14 +861,16 @@ function chrome(st, COL, availH){
     headW: 0, metaW: 0 };
 }
 
-function planPages(st){
+function planPages(st, mk){
   const S = SIZES[st.orient] || SIZES.portrait;
   const COL0 = S.w - S.pad * 2;
   const stack = fontStack(st.font, st.latinFont);
-  const probe = PLATFORM.canvas().getContext('2d');
-  probe.font = `${st.fontSize}px ${stack}`;
+  const probe = (mk || newMeasure)();
   // 竖标题的列长受版心高度限制，而版心高度又要先知道标题占多少 —— 先按整页高度估一轮
-  const ch = chrome(st, COL0, S.h - S.pad*2);
+  const ch = chrome(st, COL0, S.h - S.pad*2, mk);
+  // 🔴 正文字号必须设在 chrome() **之后**：chrome 量题头/出处时会把 font 改成 22/26px，
+  //    共用同一块量具的话，先设就被它改掉了 —— 正文会按 22px 折行，静默错到底。
+  probe.font = `${st.fontSize}px ${stack}`;
   // 版心高度。按最坏情况留（题头、标题、出处都按每页都在算）：牺牲一点留白，换绝不溢出
   const box0 = S.h - S.pad*2 - ch.head - ch.title - ch.src - ch.foot;
   const { items } = buildItems(probe, st.text, st.vertical ? box0 : COL0, st.fontSize, st.vertical);
@@ -850,7 +882,7 @@ function planPages(st){
   const W = S.w + (st.vertical ? grow : 0);
   const H = S.h + (st.vertical ? 0 : grow);
   return { S, W, H, COL: W - S.pad*2, box: box0, stack, ch,
-           pages: pages.length ? pages : [[]], title: titleBlock(st, COL0, S.h - S.pad*2) };
+           pages: pages.length ? pages : [[]], title: titleBlock(st, COL0, S.h - S.pad*2, mk) };
 }
 
 // 对齐永远是在版心里对齐，不是贴到纸边
@@ -873,7 +905,11 @@ function renderPage(canvas, st, plan, idx){
   const custom = st.metaInk && st.metaInk !== 'auto' ? inkOf(st.metaInk) : null;
   const grey = custom || (dark ? 'rgba(248,245,238,.62)' : GREY);
   const rule = custom ? custom + '66' : (dark ? 'rgba(248,245,238,.30)' : RULE);
-  const quote = dark ? QUOTE_ON_DARK : QUOTE;
+  // 引号里那段话的颜色。跟 metaInk 一个套路：auto 跟着纸深浅走，指定了就用指定的。
+  // 多一个 same＝跟正文一个色，也就是「不要引号变色」——有人就是不想要那抹橙。
+  const quote = st.quoteInk === 'same' ? ink
+              : (st.quoteInk && st.quoteInk !== 'auto') ? inkOf(st.quoteInk)
+              : (dark ? QUOTE_ON_DARK : QUOTE);
 
   canvas.width = W * DPR; canvas.height = H * DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -909,10 +945,11 @@ function renderPage(canvas, st, plan, idx){
       if (title.vertical){
         // 竖标题立在这条带里，列从右往左；titleAlign 管这一叠列往哪边靠
         const bw = title.lines.length * title.lh;
-        let tx = S.pad + alignOffset(st.titleAlign, COL, bw) + bw;
+        let tx = S.pad + alignOffset(st.titleAlign, COL, bw) + bw, tqd = 0;
         for (const col of title.lines){
           tx -= title.lh;
-          drawColumn(ctx, tx, y, col, title.size, ink, quote, tsw);
+          drawColumn(ctx, tx, y, col, title.size, ink, quote, tsw, tqd);
+          tqd = quoteDepthAfter(col, tqd);
         }
         if (st.titleRule !== false){
           ctx.fillStyle = rule;
@@ -920,10 +957,11 @@ function renderPage(canvas, st, plan, idx){
                        y, 1, ch.title - Math.round(title.size * 0.5));
         }
       } else {
-        let ty = y;
+        let ty = y, tqd = 0;
         for (const ln of title.lines){
           const w = ctx.measureText(ln).width;
-          drawRich(ctx, S.pad + alignOffset(st.titleAlign, COL, w), ty, ln, ink, quote, tsw);
+          drawRich(ctx, S.pad + alignOffset(st.titleAlign, COL, w), ty, ln, ink, quote, tsw, tqd);
+          tqd = quoteDepthAfter(ln, tqd);
           ty += title.lh;
         }
         // 标题下的短横跟着标题走，不然居左的标题配居中的横线会很怪
@@ -966,23 +1004,26 @@ function renderPage(canvas, st, plan, idx){
     if (idx === 0 && ch.titleW){
       ctx.font = `${title.size}px ${titleStack(st)}`;
       const tsw = strokeFor(st.titleWeight, title.size);
-      let tx = S.pad + COL - ch.headW - Math.round(title.size * 0.3);
+      let tx = S.pad + COL - ch.headW - Math.round(title.size * 0.3), tqd = 0;
       for (const col of title.lines){
         tx -= title.lh;
         drawColumn(ctx, tx, top + alignOffset(st.titleAlign, colH, vAdvance(ctx, col, title.size)),
-                   col, title.size, ink, quote, tsw);
+                   col, title.size, ink, quote, tsw, tqd);
+        tqd = quoteDepthAfter(col, tqd);
       }
       if (st.titleRule !== false){ ctx.fillStyle = rule; ctx.fillRect(bandR, top, 1, colH); }
     }
 
     ctx.font = `${st.fontSize}px ${stack}`;
     let x = bandR - Math.max(0, (band - used) / 2) + ox;
+    let qd = quoteDepthAtPage(pages, idx);
     for (const it of pages[idx]){
       x -= it.h;
-      if (it.gap) continue;
+      if (it.gap){ qd = 0; continue; }
       const h = vAdvance(ctx, it.text, st.fontSize);
       const cy = top + alignOffset(st.align, colH, h) + oy;
-      drawColumn(ctx, x, cy, it.text, st.fontSize, ink, quote, sw);
+      drawColumn(ctx, x, cy, it.text, st.fontSize, ink, quote, sw, qd);
+      qd = quoteDepthAfter(it.text, qd);
     }
 
     if (ch.metaW){
@@ -1005,10 +1046,13 @@ function renderPage(canvas, st, plan, idx){
     return;                                    // 竖排的页眉页脚已经画完，别再走横排那套
   } else {
     y += Math.max(0, (box - used) / 2) + oy;
+    let qd = quoteDepthAtPage(pages, idx);
     for (const it of pages[idx]){
-      if (!it.gap){
+      if (it.gap) qd = 0;                      // 换段就把没闭合的引号忘掉
+      else {
         const w = ctx.measureText(it.text).width;
-        drawRich(ctx, S.pad + alignOffset(st.align, COL, w) + ox, y, it.text, ink, quote, sw);
+        drawRich(ctx, S.pad + alignOffset(st.align, COL, w) + ox, y, it.text, ink, quote, sw, qd);
+        qd = quoteDepthAfter(it.text, qd);
       }
       y += it.h;
     }
@@ -1219,6 +1263,7 @@ function openPanel(text){
     weight: cfg('weight'), latinFont: cfg('latinFont'),
     align: cfg('align'), titleAlign: cfg('titleAlign'), vertical: cfg('vertical'),
     offsetX: cfg('offsetX'), offsetY: cfg('offsetY'), metaInk: cfg('metaInk'),
+    quoteInk: cfg('quoteInk'),
     headRule: cfg('headRule'), titleRule: cfg('titleRule'), footRule: cfg('footRule'),
     titleVertical: cfg('titleVertical'),
     sourcePrefix: cfg('sourcePrefix'),
@@ -1302,6 +1347,7 @@ function openPanel(text){
         <div class="pane" data-p="ink">
           <label>正文墨色</label><div class="row inks" id="ink"></div>
           <label>题头/出处/日期的颜色</label><div class="row inks" id="metaInk"></div>
+          <label>引号里那段话的颜色</label><div class="row inks" id="quoteInk"></div>
           <label>自己调<span class="sw"><span style="font-size:10px">双击改名 · 右键删</span></span></label>
           <div class="fs">
             <input type="color" id="ck">
@@ -1458,20 +1504,29 @@ function openPanel(text){
   mkRow('#pagesRow', [{v:'auto',n:'自动'},{v:'1',n:'1'},{v:'2',n:'2'},{v:'3',n:'3'},
                       {v:'4',n:'4'},{v:'5',n:'5'},{v:'6',n:'6'}], 'pages');
   function buildInks(){
-    // 题头/出处那一行：多一个「跟着纸」＝原来的自动行为
-    const mb = q('#metaInk'); mb.textContent = '';
-    const auto = document.createElement('button');
-    auto.dataset.v = 'auto'; auto.textContent = '跟着纸'; mb.append(auto);
-    for (const i of allInks()){
-      const b = document.createElement('button');
-      b.dataset.v = i.id; b.textContent = i.name;
-      const dot = document.createElement('i'); dot.style.background = i.c; b.prepend(dot);
-      mb.append(b);
-    }
-    mb.addEventListener('click', e => {
-      const b = e.target.closest('button'); if (!b) return;
-      st.metaInk = b.dataset.v; setCfg('metaInk', st.metaInk); sync(); draw();
-    });
+    // 题头/出处那一行、引号那一行：都是「几个特殊挡 + 全部墨色」，所以走同一个工厂。
+    // 🔑 别为第二行再抄一遍 —— 这个项目栽过三次「同一件事写两套」。
+    const mkInkRow = (sel, key, extra) => {
+      const box = q(sel); if (!box) return;
+      box.textContent = '';
+      for (const [v, n] of extra){
+        const b = document.createElement('button');
+        b.dataset.v = v; b.textContent = n; box.append(b);
+      }
+      for (const i of allInks()){
+        const b = document.createElement('button');
+        b.dataset.v = i.id; b.textContent = i.name;
+        const dot = document.createElement('i'); dot.style.background = i.c; b.prepend(dot);
+        box.append(b);
+      }
+      box.addEventListener('click', e => {
+        const b = e.target.closest('button'); if (!b) return;
+        st[key] = b.dataset.v; setCfg(key, st[key]); sync(); draw();
+      });
+    };
+    mkInkRow('#metaInk',  'metaInk',  [['auto', '跟着纸']]);
+    // 引号多一挡「跟正文」＝不要那抹橙
+    mkInkRow('#quoteInk', 'quoteInk', [['auto', '跟着纸'], ['same', '跟正文']]);
 
     const box = q('#ink'); box.textContent = '';
     for (const i of allInks()){
@@ -1807,6 +1862,7 @@ function openPanel(text){
                    ['#font', st.font], ['#ink', st.ink], ['#weight', st.weight], ['#theme', st.theme],
                    ['#align', st.align], ['#talign', st.titleAlign], ['#vert', st.vertical?'1':'0'], ['#tvert', st.titleVertical?'1':'0'],
                    ['#metaInk', st.metaInk],
+                   ['#quoteInk', st.quoteInk],
                    ['#latin', st.latinFont], ['#swTitleFont', st.titleFont], ['#tw', st.titleWeight],
                    ['#swSrc', st.showSource?'1':'0'], ['#swDate', st.showDate?'1':'0'],
                    ['#swHead', st.showHeader?'1':'0']];
@@ -2080,7 +2136,7 @@ function mountSillyTavern(){
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.5',
+    '脚本版本：0.16.7',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,
@@ -2115,10 +2171,10 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.5 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
+console.log('[拾句] 0.16.7 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
-                   PAPERS, FONTS, LATIN, INKS, SIZES,
+                   PAPERS, FONTS, LATIN, INKS, SIZES, DEF,
                    installPack, packs, paperMean, contrast, bestInk, hex2rgb, inkOf, allInks,
                    titleStack, familyOf, TAGLINES, wrapVertical, drawColumn, alignOffset, vAdvance,
                    STYLE_KEYS, BUILTIN_PRESETS,
