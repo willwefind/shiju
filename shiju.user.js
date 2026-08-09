@@ -1,10 +1,12 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.2
+// @version      0.16.3
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
+// @updateURL    https://raw.githubusercontent.com/willwefind/shiju/main/shiju.user.js
+// @downloadURL  https://raw.githubusercontent.com/willwefind/shiju/main/shiju.user.js
 // @grant        GM_download
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -14,6 +16,11 @@
 // @run-at       document-idle
 // @noframes
 // ==/UserScript==
+
+// ⚠️ 上面那段 ==UserScript== 里只能放 @xxx，别往里塞普通注释 ——
+//    篡改猴宽容，别家（iOS 的 Userscripts、暴力猴）不一定。
+//    @updateURL / @downloadURL 是让脚本管理器自己去查更新用的；
+//    不写的话，手动粘贴装进去的那一份永远停在原地。
 
 /* eslint-disable no-undef */
 (function () {
@@ -1992,7 +1999,7 @@ document.addEventListener('touchend', e => {
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.2',
+    '脚本版本：0.16.3',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,
@@ -2027,7 +2034,7 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.2 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
+console.log('[拾句] 0.16.3 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES,
