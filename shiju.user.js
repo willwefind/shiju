@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.4
+// @version      0.16.5
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
@@ -39,7 +39,7 @@ if (document.documentElement.dataset[MARK]) {
     document.documentElement.dataset[MARK] + '），这一份让开。');
   return;
 }
-document.documentElement.dataset[MARK] = '0.16.4';
+document.documentElement.dataset[MARK] = '0.16.5';
 
 // ════════════════════════════════════════════════════════════════════
 //  0. 设置（GM 存储是跨网站共享的 —— 换纸换字设一次，全网通用）
@@ -277,7 +277,7 @@ const probeCache = new Map();
 function hasFont(family){
   if (!family) return true;
   if (probeCache.has(family)) return probeCache.get(family);
-  const c = document.createElement('canvas').getContext('2d');
+  const c = PLATFORM.canvas().getContext('2d');
   const s = '天地玄黄AWMil0';
   c.font = '72px monospace';               const base = c.measureText(s).width;
   c.font = `72px "${family}", monospace`;  const got  = c.measureText(s).width;
@@ -348,11 +348,29 @@ const PAPERS = {
   black: { name:'纯黑', base:'#000000', flat:true },
 };
 
+// ════════════════════════════════════════════════════════════════════
+//  平台缝：排版/绘制这条路上，只有「造一块画布」和「造一张图」跟环境有关
+// ════════════════════════════════════════════════════════════════════
+// 收在这一处，Node 那边就只要换掉这两个函数，不用垫一整套 DOM ——
+// 这样浏览器和服务端跑的是**同一份文件**，而不是两份会分叉的实现。
+// 面板 UI 里的 createElement 不走这里（那些本来就只在浏览器里活）。
+const PLATFORM = {
+  canvas(w, h){
+    const c = document.createElement('canvas');
+    if (w != null) c.width = w;
+    if (h != null) c.height = h;
+    return c;
+  },
+  image(){ return new Image(); },
+};
+// 加载这份脚本之前先塞一个 globalThis.__shijuPlatform，就能整体替换掉上面两件
+try { if (globalThis.__shijuPlatform) Object.assign(PLATFORM, globalThis.__shijuPlatform); } catch {}
+
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 
 function blobLayer(w, h, cell, rnd){
   const sw = Math.max(2, Math.ceil(w/cell)), sh = Math.max(2, Math.ceil(h/cell));
-  const c = document.createElement('canvas'); c.width = sw; c.height = sh;
+  const c = PLATFORM.canvas(sw, sh);
   const ctx = c.getContext('2d'), img = ctx.createImageData(sw, sh);
   for (let i = 0; i < sw*sh; i++){
     const v = 128 + (rnd()-0.5)*255;
@@ -370,7 +388,7 @@ function makePaper(kind, w, h, seedShift){
   const spec = PAPERS[kind] || PAPERS.rice;
   // 每一页的纸纹都不一样（真的一叠纸就是这样），但同一页每次重画都一样
   const rnd = mulberry32(0x5E1F + kind.length*977 + kind.charCodeAt(0)*13 + (seedShift || 0)*7919);
-  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const cv = PLATFORM.canvas(w, h);
   const ctx = cv.getContext('2d');
 
   ctx.fillStyle = spec.base; ctx.fillRect(0, 0, w, h);
@@ -438,7 +456,7 @@ function myPaper(id){
   if (myPaperImgs.has(id)) return myPaperImgs.get(id);
   const rec = cfg('myPapers').find(p => p.id === id);
   if (!rec) return null;
-  const img = new Image(); img.src = rec.data;
+  const img = PLATFORM.image(); img.src = rec.data;
   myPaperImgs.set(id, img);
   return img;
 }
@@ -454,7 +472,7 @@ function packImg(key, orient){
   const id = key + ':' + orient;
   if (packImgs.has(id)) return packImgs.get(id);
   const s = packSet(key); if (!s) return null;
-  const img = new Image(); img.src = s[orient] || s.portrait;
+  const img = PLATFORM.image(); img.src = s[orient] || s.portrait;
   packImgs.set(id, img);
   return img;
 }
@@ -474,7 +492,7 @@ function paperMeanRaw(paperId){
   } else if (paperId.startsWith('my:')){
     const img = myPaper(paperId.slice(3));
     if (img && img.complete && img.naturalWidth){
-      const c = document.createElement('canvas'); c.width = c.height = 1;
+      const c = PLATFORM.canvas(1, 1);
       const cx = c.getContext('2d'); cx.drawImage(img, 0, 0, 1, 1);
       const d = cx.getImageData(0, 0, 1, 1).data; rgb = [d[0], d[1], d[2]];
     } else return rgb;                       // 还没解码完，先别记进缓存
@@ -603,7 +621,7 @@ function vAdvance(ctx, col, size){
 
 // colH 是像素高度，不是格子数
 function wrapVertical(str, size, colH, ctx){
-  if (!ctx){ const c = document.createElement('canvas').getContext('2d'); c.font = `${size}px serif`; ctx = c; }
+  if (!ctx){ const c = PLATFORM.canvas().getContext('2d'); c.font = `${size}px serif`; ctx = c; }
   const cols = [];
   let cur = '';
   for (let tok of tokenize(str)){
@@ -752,7 +770,7 @@ function titleBlock(st, COL, availH){
   if (!t) return { lines: [], h: 0, w: 0, size: 0, lh: 0, vertical: false };
   const size = titleFontSize(st);
   const lh = Math.round(size * 1.42);
-  const ctx = document.createElement('canvas').getContext('2d');
+  const ctx = PLATFORM.canvas().getContext('2d');
   // 🔴 latinFont 必须显式从 st 传：不传的话 fontStack 会去读存储里的配置，
   //    当前状态被无声忽略 —— 会变成「选了西文字体却没反应」。
   ctx.font = `${size}px ${titleStack(st)}`;
@@ -780,7 +798,7 @@ function chrome(st, COL, availH){
   const head = st.showHeader ? (st.headText || '').trim() : '';
   const src  = st.showSource ? (st.source || '').trim() : '';
   const date = st.showDate ? (st.date || '').trim() : '';
-  const ctx = document.createElement('canvas').getContext('2d');
+  const ctx = PLATFORM.canvas().getContext('2d');
   const stack = fontStack(st.font, st.latinFont);
 
   if (st.vertical){
@@ -817,7 +835,7 @@ function planPages(st){
   const S = SIZES[st.orient] || SIZES.portrait;
   const COL0 = S.w - S.pad * 2;
   const stack = fontStack(st.font, st.latinFont);
-  const probe = document.createElement('canvas').getContext('2d');
+  const probe = PLATFORM.canvas().getContext('2d');
   probe.font = `${st.fontSize}px ${stack}`;
   // 竖标题的列长受版心高度限制，而版心高度又要先知道标题占多少 —— 先按整页高度估一轮
   const ch = chrome(st, COL0, S.h - S.pad*2);
@@ -2062,7 +2080,7 @@ function mountSillyTavern(){
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.4',
+    '脚本版本：0.16.5',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,
@@ -2097,7 +2115,7 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.4 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
+console.log('[拾句] 0.16.5 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES,
