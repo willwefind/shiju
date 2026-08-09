@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.0
+// @version      0.16.1
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
@@ -996,10 +996,15 @@ const CSS = `
 .side p.h{margin:0 0 12px;font-size:11px;color:var(--dim)}
 label{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.1em;
       color:var(--dim);margin:13px 0 5px}
-label .sw{display:flex;gap:4px}
-label .sw button{border:1px solid var(--line);background:var(--btn);border-radius:3px;font-size:10px;
+/* 🔴 这三条原本写的是「label .sw …」（这段 CSS 住在模板字符串里，注释别用反引号）
+   —— 可 .sw 有一半根本不在 label 里
+   （常/中/粗 那两排在 .fs 行里，跟随/白天/黑夜 在 h2 里）。结果那些按钮拿的是浏览器
+   默认样式：灰底黑字，而且**选中的那颗跟没选中的长得一模一样**，按了不知道按没按上。
+   去掉 label 前缀，一视同仁。 */
+.sw{display:flex;gap:4px}
+.sw button{border:1px solid var(--line);background:var(--btn);border-radius:3px;font-size:10px;
       padding:2px 7px;cursor:pointer;color:var(--dim);letter-spacing:0}
-label .sw button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg)}
+.sw button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg)}
 textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:4px;padding:8px;
      font:13px/1.7 inherit;background:var(--field);resize:vertical;color:var(--fg)}
 textarea{height:110px}
@@ -1055,8 +1060,11 @@ input[type=text]:disabled{opacity:.5}
 .pages{flex:1;min-height:0;overflow:auto;display:flex;flex-wrap:wrap;gap:14px;align-content:flex-start;
        justify-content:center;padding:4px}
 .pg{position:relative;cursor:pointer}
+/* touch-action:pinch-zoom —— 整块位移是在画布上按住拖出来的。触屏上不写这一句，
+   单指拖会被浏览器当成滚动手势收走（pointerdown 里 preventDefault 挡不住滚动，
+   挡它的就是 touch-action），于是手机上「拖不动」。留着 pinch-zoom 是为了还能双指放大看细节。 */
 .pg canvas{display:block;max-width:100%;box-shadow:0 6px 20px rgba(0,0,0,.18);border-radius:2px;
-       outline:2px solid transparent;outline-offset:3px}
+       outline:2px solid transparent;outline-offset:3px;touch-action:pinch-zoom}
 .pg[aria-selected=true] canvas{outline-color:rgba(185,32,11,.7)}
 .pg span{position:absolute;left:6px;top:6px;background:rgba(18,16,14,.72);color:#faf8f4;
        font-size:10px;padding:1px 6px;border-radius:3px}
@@ -1075,6 +1083,14 @@ input[type=text]:disabled{opacity:.5}
   .side h2{font-size:13px}
   textarea{height:88px}
   .acts button{padding:12px}
+  /* 手指按不准 24px 高的按钮。桌面上 29×24 够用，手机上把这几排撑开。 */
+  .tabs button{padding:11px 2px;font-size:13px}
+  .sw button{padding:10px 11px;font-size:11px}
+  .row button{padding:10px 6px}
+}
+/* 「摘」那颗药丸也一样：手指点得中才算数 */
+@media (pointer: coarse){
+  .pill{padding:11px 20px;font-size:14px}
 }
 `;
 
@@ -1919,7 +1935,7 @@ document.addEventListener('keydown', e => {
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.0',
+    '脚本版本：0.16.1',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有（油猴没授权？）'}`,
@@ -1952,7 +1968,7 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.0 已在这一页启动。选中文字会冒出「摘」；不选也行，按 Alt+Q 开一张白纸。');
+console.log('[拾句] 0.16.1 已在这一页启动。选中文字会冒出「摘」；不选也行，按 Alt+Q 开一张白纸。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES,
