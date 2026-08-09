@@ -1,7 +1,9 @@
-# 素材包是各人自己的图，不入库
+# 素材包默认不入库（各人自己的图）。
+# 例外：papers/ 是随仓公开的那 20 套信纸，连同它的成品包一起带走。
+# ⚠️ 别把 papers/ 整个目录写回 ignore —— 目录被排除之后，里面的文件再怎么 ! 也捞不回来。
 *.pack.json
+!papers/*.pack.json
 my-papers*/
-papers/
 
 # 字体原档太大，只收 fonts/ 里明确可再分发的那些
 字体_双击安装/
@@ -14,3 +16,4 @@ _*.jpg
 _*.png
 out/
 node_modules/
+__pycache__/

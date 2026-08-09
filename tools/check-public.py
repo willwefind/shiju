@@ -13,6 +13,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKIP_DIRS = {'.git', 'node_modules'}
 BIN_EXT = {'.ttf', '.otf', '.woff', '.woff2', '.png', '.jpg', '.jpeg', '.webp', '.zip', '.pdf'}
 
+# 本来就该在仓里的「大东西」。闸报警必须是真问题 —— 只要有一次是误报，
+# 人就开始整条无视它，那这道闸等于没有。
+ALLOW = {'papers/letterpaper-20sets.pack.json'}
+
 # 绝不能出现在公开仓里的东西
 FORBIDDEN = [
     (r'[A-Za-z]:\\\\?(Users|CielApps|shiju|mufy)', '本机绝对路径'),
@@ -35,17 +39,22 @@ REVIEW = [
 SELF = os.path.abspath(__file__)
 
 
-def files():
+def all_files():
+    """全仓的文件。⚠️ .git 一定要跳 —— 它的 pack 文件轻易过 5MB，会把体积闸打成误报。"""
     for base, dirs, names in os.walk(ROOT):
         dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
         for n in names:
-            p = os.path.join(base, n)
-            # 规则表里本来就写着那些词，扫自己必然自咬
-            if os.path.abspath(p) == SELF:
-                continue
-            if os.path.splitext(n)[1].lower() in BIN_EXT:
-                continue
-            yield p
+            yield os.path.join(base, n)
+
+
+def files():
+    for p in all_files():
+        # 规则表里本来就写着那些词，扫自己必然自咬
+        if os.path.abspath(p) == SELF:
+            continue
+        if os.path.splitext(p)[1].lower() in BIN_EXT:
+            continue
+        yield p
 
 
 def scan(rules):
@@ -84,10 +93,10 @@ def main():
             seen.add(k)
             print(f'   {f}:{i}  [{why}]  {line}', file=out)
 
-    # 素材包和大字体绝不能混进来
-    strays = [os.path.relpath(p, ROOT) for p in
-              (os.path.join(b, n) for b, d, ns in os.walk(ROOT) for n in ns)
-              if p.endswith('.pack.json') or os.path.getsize(p) > 5_000_000]
+    # 素材包和大字体绝不能混进来 —— 除了 ALLOW 里那几个本来就该在的
+    strays = [r for r in (os.path.relpath(p, ROOT).replace('\\', '/') for p in all_files()
+                          if p.endswith('.pack.json') or os.path.getsize(p) > 5_000_000)
+              if r not in ALLOW]
     if strays:
         print('\n🔴 体积超 5MB 或是素材包的文件：', file=out)
         for s in strays:

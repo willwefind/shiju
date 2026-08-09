@@ -1,0 +1,262 @@
+{
+ "soft01": {
+  "key": "soft01",
+  "group": "soft",
+  "name": "ivory",
+  "mean": [
+   252.98626708984375,
+   248.6360321044922,
+   243.4820556640625
+  ],
+  "grain": 1.243,
+  "landscape": "soft01_landscape.webp",
+  "portrait": "soft01_portrait.webp"
+ },
+ "soft02": {
+  "key": "soft02",
+  "group": "soft",
+  "name": "warm_cream",
+  "mean": [
+   248.66236877441406,
+   242.99876403808594,
+   208.5711212158203
+  ],
+  "grain": 1.354,
+  "landscape": "soft02_landscape.webp",
+  "portrait": "soft02_portrait.webp"
+ },
+ "soft03": {
+  "key": "soft03",
+  "group": "soft",
+  "name": "blush",
+  "mean": [
+   248.5574951171875,
+   210.7972412109375,
+   211.69375610351562
+  ],
+  "grain": 1.296,
+  "landscape": "soft03_landscape.webp",
+  "portrait": "soft03_portrait.webp"
+ },
+ "soft04": {
+  "key": "soft04",
+  "group": "soft",
+  "name": "lavender",
+  "mean": [
+   236.5640411376953,
+   211.57264709472656,
+   250.57362365722656
+  ],
+  "grain": 1.299,
+  "landscape": "soft04_landscape.webp",
+  "portrait": "soft04_portrait.webp"
+ },
+ "soft05": {
+  "key": "soft05",
+  "group": "soft",
+  "name": "water_blue",
+  "mean": [
+   205.92701721191406,
+   243.76409912109375,
+   250.22999572753906
+  ],
+  "grain": 1.262,
+  "landscape": "soft05_landscape.webp",
+  "portrait": "soft05_portrait.webp"
+ },
+ "soft06": {
+  "key": "soft06",
+  "group": "soft",
+  "name": "mint",
+  "mean": [
+   209.86822509765625,
+   245.43336486816406,
+   236.5502166748047
+  ],
+  "grain": 1.262,
+  "landscape": "soft06_landscape.webp",
+  "portrait": "soft06_portrait.webp"
+ },
+ "soft07": {
+  "key": "soft07",
+  "group": "soft",
+  "name": "silver_gray",
+  "mean": [
+   236.44444274902344,
+   239.99208068847656,
+   242.01893615722656
+  ],
+  "grain": 1.378,
+  "landscape": "soft07_landscape.webp",
+  "portrait": "soft07_portrait.webp"
+ },
+ "soft08": {
+  "key": "soft08",
+  "group": "soft",
+  "name": "sand",
+  "mean": [
+   245.35736083984375,
+   215.3993682861328,
+   196.96868896484375
+  ],
+  "grain": 1.449,
+  "landscape": "soft08_landscape.webp",
+  "portrait": "soft08_portrait.webp"
+ },
+ "soft09": {
+  "key": "soft09",
+  "group": "soft",
+  "name": "klein_mist",
+  "mean": [
+   193.3677520751953,
+   208.94894409179688,
+   253.58193969726562
+  ],
+  "grain": 1.498,
+  "landscape": "soft09_landscape.webp",
+  "portrait": "soft09_portrait.webp"
+ },
+ "soft10": {
+  "key": "soft10",
+  "group": "soft",
+  "name": "night_mist",
+  "mean": [
+   197.42410278320312,
+   206.75074768066406,
+   241.2538604736328
+  ],
+  "grain": 1.475,
+  "landscape": "soft10_landscape.webp",
+  "portrait": "soft10_portrait.webp"
+ },
+ "bold01": {
+  "key": "bold01",
+  "group": "bold",
+  "name": "true_klein_blue",
+  "mean": [
+   0.9758636951446533,
+   46.96952438354492,
+   174.74349975585938
+  ],
+  "grain": 2.016,
+  "landscape": "bold01_landscape.webp",
+  "portrait": "bold01_portrait.webp"
+ },
+ "bold02": {
+  "key": "bold02",
+  "group": "bold",
+  "name": "dusk_indigo",
+  "mean": [
+   47.50796890258789,
+   53.329559326171875,
+   102.31471252441406
+  ],
+  "grain": 2.091,
+  "landscape": "bold02_landscape.webp",
+  "portrait": "bold02_portrait.webp"
+ },
+ "bold03": {
+  "key": "bold03",
+  "group": "bold",
+  "name": "burgundy",
+  "mean": [
+   128.75994873046875,
+   32.95639419555664,
+   52.106754302978516
+  ],
+  "grain": 2.208,
+  "landscape": "bold03_landscape.webp",
+  "portrait": "bold03_portrait.webp"
+ },
+ "bold04": {
+  "key": "bold04",
+  "group": "bold",
+  "name": "sage_green",
+  "mean": [
+   134.85780334472656,
+   172.91131591796875,
+   143.61500549316406
+  ],
+  "grain": 1.602,
+  "landscape": "bold04_landscape.webp",
+  "portrait": "bold04_portrait.webp"
+ },
+ "bold05": {
+  "key": "bold05",
+  "group": "bold",
+  "name": "smoked_orange",
+  "mean": [
+   194.23306274414062,
+   99.3414535522461,
+   62.72411346435547
+  ],
+  "grain": 1.781,
+  "landscape": "bold05_landscape.webp",
+  "portrait": "bold05_portrait.webp"
+ },
+ "bold06": {
+  "key": "bold06",
+  "group": "bold",
+  "name": "vintage_mustard",
+  "mean": [
+   216.8225860595703,
+   183.67445373535156,
+   69.95477294921875
+  ],
+  "grain": 1.665,
+  "landscape": "bold06_landscape.webp",
+  "portrait": "bold06_portrait.webp"
+ },
+ "bold07": {
+  "key": "bold07",
+  "group": "bold",
+  "name": "glacier_cyan",
+  "mean": [
+   179.4311981201172,
+   208.87864685058594,
+   234.72607421875
+  ],
+  "grain": 1.554,
+  "landscape": "bold07_landscape.webp",
+  "portrait": "bold07_portrait.webp"
+ },
+ "bold08": {
+  "key": "bold08",
+  "group": "bold",
+  "name": "smoky_violet",
+  "mean": [
+   128.16098022460938,
+   127.8262710571289,
+   143.63311767578125
+  ],
+  "grain": 1.685,
+  "landscape": "bold08_landscape.webp",
+  "portrait": "bold08_portrait.webp"
+ },
+ "bold09": {
+  "key": "bold09",
+  "group": "bold",
+  "name": "graphite_blue",
+  "mean": [
+   63.30375671386719,
+   82.09991455078125,
+   96.96953582763672
+  ],
+  "grain": 2.073,
+  "landscape": "bold09_landscape.webp",
+  "portrait": "bold09_portrait.webp"
+ },
+ "bold10": {
+  "key": "bold10",
+  "group": "bold",
+  "name": "ink_green",
+  "mean": [
+   26.199716567993164,
+   66.60260772705078,
+   61.92007064819336
+  ],
+  "grain": 2.275,
+  "landscape": "bold10_landscape.webp",
+  "portrait": "bold10_portrait.webp"
+ }
+}
