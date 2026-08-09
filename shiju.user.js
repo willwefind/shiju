@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.15.0
+// @version      0.16.0
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
@@ -28,7 +28,9 @@ const DEF = {
   weight: 0,            // 字重：0 常规 / 1 中 / 2 粗
   latinFont: 'none',    // 西文字体：拼在中文字体前面，只接管拉丁字母和数字
   titleFont: 'same',    // 标题字体：same = 跟正文一样
-  titleScale: 150,      // 标题字号 = 正文 × 这个百分比
+  // 标题字号是**绝对像素**，不是正文的百分比 —— 早先按百分比算，于是一动正文字号
+  // 标题就跟着变，「把标题和正文分开调」根本做不到。
+  titleSize: 69,
   titleWeight: 1,
   inkLight: 0,          // 墨色明暗 −50…+50（正=往白走，负=往黑走）
   paperLight: 0,        // 纸张明暗 −50…+50
@@ -52,6 +54,26 @@ const DEF = {
 };
 const cfg    = k => { try { const v = GM_getValue(k); return v === undefined ? DEF[k] : v; } catch { return DEF[k]; } };
 const setCfg = (k, v) => { try { GM_setValue(k, v); } catch (e) { console.warn('[拾句] 存不下设置：', e.message); } };
+
+// 一次性迁移：标题字号从「正文的百分比」改成绝对像素。
+// 🔴 两种表示法并存必然对不上（同一件事写两套算法），所以迁完就把 titleScale 彻底扔掉，
+//    代码里再也不认这个键。存下来的版式也一起迁，不然老版式一点就丢标题字号。
+(function migrateTitleSize(){
+  const px = (base, scale) => Math.round((base === undefined ? DEF.fontSize : base) * scale / 100);
+  try {
+    if (GM_getValue('titleSize') === undefined && GM_getValue('titleScale') !== undefined)
+      GM_setValue('titleSize', px(GM_getValue('fontSize'), GM_getValue('titleScale')));
+    const ps = GM_getValue('presets');
+    if (Array.isArray(ps) && ps.some(p => p && p.style && p.style.titleScale !== undefined))
+      GM_setValue('presets', ps.map(p => {
+        if (!p || !p.style || p.style.titleScale === undefined) return p;
+        const style = { ...p.style };
+        style.titleSize = px(style.fontSize, style.titleScale);
+        delete style.titleScale;
+        return { ...p, style };
+      }));
+  } catch (e) { console.warn('[拾句] 标题字号迁移没跑成：', e.message); }
+})();
 
 // ════════════════════════════════════════════════════════════════════
 //  1. 皮肤 token
@@ -105,7 +127,7 @@ const bestInk = mean => allInks().reduce((best, i) =>
 
 // 一套「版式」＝下面这些键（纸、字、色、排版全在内）。内容（正文/出处/日期）不在里面 —— 换版式不该动已经写好的字。
 const STYLE_KEYS = ['paper','font','latinFont','fontSize','ink','metaInk','orient','pages',
-                    'weight','titleFont','titleScale','titleWeight','inkLight','paperLight',
+                    'weight','titleFont','titleSize','titleWeight','inkLight','paperLight',
                     'align','titleAlign','vertical','offsetX','offsetY',
                     'headText','showHeader','showSource','showDate',
                     'headRule','titleRule','footRule','sourcePrefix','titleVertical'];
@@ -113,19 +135,19 @@ const STYLE_KEYS = ['paper','font','latinFont','fontSize','ink','metaInk','orien
 const BUILTIN_PRESETS = [
   { id:'p_zhai', name:'摘录', style:{ headText:'摘 录', showHeader:true, showSource:true, showDate:true,
       align:'left', titleAlign:'center', vertical:false, orient:'portrait', paper:'rice',
-      ink:'black', metaInk:'auto', fontSize:46, titleScale:150, titleWeight:1, weight:0,
+      ink:'black', metaInk:'auto', fontSize:46, titleSize:69, titleWeight:1, weight:0,
       offsetX:0, offsetY:0 } },
   { id:'p_riji', name:'日记', style:{ headText:'日 记', showHeader:true, showSource:false, showDate:true,
       align:'left', titleAlign:'left', vertical:false, orient:'portrait', paper:'cream',
-      ink:'sepia', metaInk:'auto', fontSize:44, titleScale:130, titleWeight:0, weight:1,
+      ink:'sepia', metaInk:'auto', fontSize:44, titleSize:57, titleWeight:0, weight:1,
       offsetX:0, offsetY:0 } },
   { id:'p_xin',  name:'信件', style:{ headText:'', showHeader:false, showSource:true, showDate:true,
       align:'left', titleAlign:'left', vertical:false, orient:'portrait', paper:'linen',
-      ink:'indigo', metaInk:'auto', fontSize:42, titleScale:140, titleWeight:0, weight:0,
+      ink:'indigo', metaInk:'auto', fontSize:42, titleSize:59, titleWeight:0, weight:0,
       offsetX:0, offsetY:0 } },
   { id:'p_shu',  name:'竖排', style:{ headText:'', showHeader:false, showSource:true, showDate:true,
       align:'left', titleAlign:'center', vertical:true, orient:'portrait', paper:'rice',
-      ink:'black', metaInk:'auto', fontSize:44, titleScale:150, titleWeight:0, weight:0,
+      ink:'black', metaInk:'auto', fontSize:44, titleSize:66, titleWeight:0, weight:0,
       offsetX:0, offsetY:0 } },
 ];
 
@@ -673,14 +695,15 @@ function paginate(items, cap, forceN){
 // ════════════════════════════════════════════════════════════════════
 //  6. 画一页
 // ════════════════════════════════════════════════════════════════════
-const titleSize = st => Math.round(st.fontSize * (st.titleScale || 150) / 100);
+// 标题字号：绝对像素，跟正文字号互不相干。夹一道上下限，别让旧值或手输的数字画出鬼来。
+const titleFontSize = st => Math.max(12, Math.min(300, Math.round(st.titleSize || DEF.titleSize)));
 
 // 标题排好之后占多高。只印第一页，但**每页都按它预留**——
 // 各页版心一样高，正文垂直居中才对得齐，也绝不会溢出。
 function titleBlock(st, COL, availH){
   const t = (st.title || '').trim();
   if (!t) return { lines: [], h: 0, w: 0, size: 0, lh: 0, vertical: false };
-  const size = titleSize(st);
+  const size = titleFontSize(st);
   const lh = Math.round(size * 1.42);
   const ctx = document.createElement('canvas').getContext('2d');
   // 🔴 latinFont 必须显式从 st 传：不传的话 fontStack 会去读存储里的配置，
@@ -1037,6 +1060,22 @@ input[type=text]:disabled{opacity:.5}
 .pg[aria-selected=true] canvas{outline-color:rgba(185,32,11,.7)}
 .pg span{position:absolute;left:6px;top:6px;background:rgba(18,16,14,.72);color:#faf8f4;
        font-size:10px;padding:1px 6px;border-radius:3px}
+
+/* 手机：左右分栏在窄屏上必死 —— 侧栏钉死 308px，预览区被挤成 0 宽，
+   实测 375px 视口下画布量出来就是 0×0（能操作，但一眼都看不见成品）。
+   改成上下叠：预览在上，控制在下。 */
+@media (max-width: 760px){
+  .mask{padding:0}
+  .box{flex-direction:column;gap:10px;padding:12px;border-radius:0;
+       width:100%;height:100dvh;max-height:100dvh}
+  /* 55vh：竖版卡片按屏宽铺开正好这么高，整张能一眼看全，不用滚 */
+  .view{order:-1;flex:0 0 auto;max-height:55vh;min-height:0}
+  .pages{padding:0;gap:8px}
+  .side{width:auto;flex:1 1 auto;padding-right:0}
+  .side h2{font-size:13px}
+  textarea{height:88px}
+  .acts button{padding:12px}
+}
 `;
 
 let host, root, pill, mask, tipEl, hideTimer;
@@ -1100,7 +1139,7 @@ function openPanel(text){
     headRule: cfg('headRule'), titleRule: cfg('titleRule'), footRule: cfg('footRule'),
     titleVertical: cfg('titleVertical'),
     sourcePrefix: cfg('sourcePrefix'),
-    titleFont: cfg('titleFont'), titleScale: cfg('titleScale'), titleWeight: cfg('titleWeight'),
+    titleFont: cfg('titleFont'), titleSize: cfg('titleSize'), titleWeight: cfg('titleWeight'),
     inkLight: cfg('inkLight'), paperLight: cfg('paperLight'),
     theme: cfg('theme'),
     showHeader: cfg('showHeader'), showSource: cfg('showSource'), showDate: cfg('showDate'),
@@ -1126,15 +1165,22 @@ function openPanel(text){
         </div>
 
         <div class="pane" data-p="text">
-          <label>标题</label>
+          <label>标题<span class="sw"><span style="font-size:10px">字号 · 字重</span></span></label>
           <input type="text" id="ti" placeholder="留空就没有标题">
           <div class="fs" style="margin-top:6px">
-            <input type="range" id="ts" min="90" max="300" step="5">
-            <span class="val" id="tsv"></span>
+            <input type="range" id="ts" min="20" max="140" step="1">
+            <input type="number" id="tsn" min="12" max="300" step="1">
             <span class="sw" id="tw">
               <button data-v="0">常</button><button data-v="1">中</button><button data-v="2">粗</button></span>
           </div>
-          <label>内容</label><textarea id="t"></textarea>
+          <label>内容<span class="sw"><span style="font-size:10px">字号 · 字重</span></span></label>
+          <textarea id="t"></textarea>
+          <div class="fs" style="margin-top:6px">
+            <input type="range" id="fs" min="20" max="96" step="1">
+            <input type="number" id="fsn" min="12" max="200" step="1">
+            <span class="sw" id="weight">
+              <button data-v="0">常</button><button data-v="1">中</button><button data-v="2">粗</button></span>
+          </div>
           <label>出处<span class="sw" id="swSrc">
             <button data-v="1">显示</button><button data-v="0">隐藏</button></span></label>
           <div class="fs">
@@ -1184,7 +1230,6 @@ function openPanel(text){
           <label>墨色明暗</label>
           <div class="fs"><input type="range" id="il" min="-50" max="50" step="1">
             <span class="val" id="ilv"></span></div>
-          <label>字重</label><div class="row" id="weight"></div>
         </div>
 
         <div class="pane" data-p="layout">
@@ -1204,11 +1249,6 @@ function openPanel(text){
           <label>标题对齐</label><div class="row" id="talign"></div>
           <label>版式</label><div class="row" id="orient"></div>
           <label>拆成几张</label><div class="row" id="pagesRow"></div>
-          <label>字号</label>
-          <div class="fs">
-            <input type="range" id="fs" min="20" max="96" step="1">
-            <input type="number" id="fsn" min="12" max="200" step="1">
-          </div>
           <label>整块位移<span class="sw"><span style="font-size:10px">在右边预览图上直接拖</span></span></label>
           <div class="fs">
             <span class="val" id="offv" style="width:auto"></span>
@@ -1238,7 +1278,7 @@ function openPanel(text){
   q('#t').value = st.text; q('#s').value = st.source; q('#d').value = st.date;
   q('#hd').value = st.headText; q('#ti').value = st.title; q('#sp').value = st.sourcePrefix;
   q('#fs').value = st.fontSize; q('#fsn').value = st.fontSize;
-  q('#ts').value = st.titleScale;
+  q('#ts').value = st.titleSize; q('#tsn').value = st.titleSize;
 
   // ── 画 ──────────────────────────────────────────────────────────
   let plan = null, dragging = false;
@@ -1381,7 +1421,6 @@ function openPanel(text){
       st.ink = b.dataset.v; setCfg('ink', st.ink); sync(); draw();
     });
   }
-  mkRow('#weight', [{v:'0',n:'常规'},{v:'1',n:'中粗'},{v:'2',n:'加粗'}], 'weight', v => +v);
   mkRow('#align',  [{v:'left',n:'左'},{v:'center',n:'中'},{v:'right',n:'右'}], 'align');
   mkRow('#talign', [{v:'left',n:'左'},{v:'center',n:'中'},{v:'right',n:'右'}], 'titleAlign');
   q('#vert').addEventListener('click', e => {
@@ -1402,7 +1441,7 @@ function openPanel(text){
     for (const k of STYLE_KEYS) if (k in p.style){ st[k] = p.style[k]; setCfg(k, st[k]); }
     q('#hd').value = st.headText; q('#sp').value = st.sourcePrefix;
     q('#fs').value = Math.max(20, Math.min(96, st.fontSize)); q('#fsn').value = st.fontSize;
-    q('#ts').value = st.titleScale;
+    q('#ts').value = Math.max(20, Math.min(140, st.titleSize)); q('#tsn').value = st.titleSize;
     q('#ck').value = /^#[0-9a-f]{6}$/i.test(st.ink) ? st.ink : inkOf(st.ink);
     buildPapers(); buildFonts(); buildInks(); buildPresets(); sync(); draw();
     tipEl.textContent = `换成「${p.name}」了。内容没动。`;
@@ -1453,7 +1492,11 @@ function openPanel(text){
     const b = e.target.closest('button'); if (!b) return;
     st.titleWeight = +b.dataset.v; setCfg('titleWeight', st.titleWeight); sync(); draw();
   });
-  q('#ts').oninput = e => { st.titleScale = +e.target.value; setCfg('titleScale', st.titleScale); sync(); draw(); };
+  // 正文字重。跟标题那排长一个样，就摆在内容框底下 —— 标题怎么调，正文就怎么调。
+  q('#weight').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    st.weight = +b.dataset.v; setCfg('weight', st.weight); sync(); draw();
+  });
   q('#theme').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     st.theme = b.dataset.v; setCfg('theme', st.theme); applyTheme(); sync();
@@ -1692,20 +1735,24 @@ function openPanel(text){
     const fmt = v => (v > 0 ? '+' : '') + v;
     q('#il').value = st.inkLight;   q('#ilv').textContent = fmt(st.inkLight);
     q('#pl').value = st.paperLight; q('#plv').textContent = fmt(st.paperLight);
-    q('#tsv').textContent = st.titleScale + '%';
     q('#offv').textContent = (st.offsetX || st.offsetY)
       ? `左右 ${Math.round(st.offsetX)} · 上下 ${Math.round(st.offsetY)}` : '没挪过';
   };
 
-  // 字号：滑块和数字框互相跟随，数字框可以超出滑块范围
-  const setFS = v => {
-    const n = Math.max(12, Math.min(200, Math.round(+v || 46)));
-    st.fontSize = n; setCfg('fontSize', n);
-    q('#fs').value = Math.max(20, Math.min(96, n)); q('#fsn').value = n;
-    draw();
+  // 字号：滑块和数字框互相跟随，数字框可以超出滑块范围。
+  // 正文一套、标题一套，但推进规则只写这一份 —— 同一件事写两处，迟早对不上。
+  const mkSize = (key, rng, num, lo, hi, sLo, sHi) => {
+    const set = v => {
+      const n = Math.max(lo, Math.min(hi, Math.round(+v || DEF[key])));
+      st[key] = n; setCfg(key, n);
+      q(rng).value = Math.max(sLo, Math.min(sHi, n)); q(num).value = n;
+      draw();
+    };
+    q(rng).oninput = e => set(e.target.value);
+    q(num).oninput = e => { if (e.target.value !== '') set(e.target.value); };
   };
-  q('#fs').oninput  = e => setFS(e.target.value);
-  q('#fsn').oninput = e => { if (e.target.value !== '') setFS(e.target.value); };
+  mkSize('fontSize',  '#fs',  '#fsn', 12, 200, 20,  96);
+  mkSize('titleSize', '#ts',  '#tsn', 12, 300, 20, 140);
   // 取色器：拖的时候就直接用上（st.ink 可以直接是个 #rrggbb，不必先存），存不存随意
   q('#ck').oninput = e => { st.ink = e.target.value; setCfg('ink', st.ink); sync(); draw(); };
   q('#ckSave').onclick = () => {
@@ -1872,7 +1919,7 @@ document.addEventListener('keydown', e => {
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.15.0',
+    '脚本版本：0.16.0',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有（油猴没授权？）'}`,
@@ -1905,7 +1952,7 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.15.0 已在这一页启动。选中文字会冒出「摘」；不选也行，按 Alt+Q 开一张白纸。');
+console.log('[拾句] 0.16.0 已在这一页启动。选中文字会冒出「摘」；不选也行，按 Alt+Q 开一张白纸。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES,
