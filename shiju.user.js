@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.1
+// @version      0.16.2
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
@@ -52,8 +52,32 @@ const DEF = {
   subdir: '摘录',
   myPapers: [], myFonts: [],
 };
-const cfg    = k => { try { const v = GM_getValue(k); return v === undefined ? DEF[k] : v; } catch { return DEF[k]; } };
-const setCfg = (k, v) => { try { GM_setValue(k, v); } catch (e) { console.warn('[拾句] 存不下设置：', e.message); } };
+// 🔴 iOS 上的 Userscripts **没有**同步的 GM_getValue/GM_setValue（它只给异步的 GM.getValue）。
+//    照原样直接调，每次都落到 catch 里返回默认值 —— 表现是「改了纸改了字，换一页全没了」，
+//    而且一声不吭。探不到 GM 存储就退到 localStorage。
+// ⚠️ 两者不等价：GM 存储跨网站共享，localStorage 按站点分家（每个网站要各设一次），
+//    而且只有 ~5MB，3MB 的信纸素材包多半塞不进去。这些都在自检里如实说。
+const hasGM = (() => {
+  try { return typeof GM_getValue === 'function' && typeof GM_setValue === 'function'; }
+  catch { return false; }
+})();
+const LSK = 'shiju:';
+// 存了什么就返回什么，没存过返回 undefined —— 「没存过」和「存了个默认值」得分得开
+const rawCfg = k => {
+  try {
+    if (hasGM) return GM_getValue(k);
+    const s = localStorage.getItem(LSK + k);
+    return s === null ? undefined : JSON.parse(s);
+  } catch { return undefined; }
+};
+const cfg = k => { const v = rawCfg(k); return v === undefined ? DEF[k] : v; };
+// 返回「到底存下没有」—— localStorage 会因为超配额而失败，失败了就得让人知道
+const setCfg = (k, v) => {
+  try {
+    if (hasGM) GM_setValue(k, v); else localStorage.setItem(LSK + k, JSON.stringify(v));
+    return true;
+  } catch (e) { console.warn('[拾句] 存不下设置：', e.message); return false; }
+};
 
 // 一次性迁移：标题字号从「正文的百分比」改成绝对像素。
 // 🔴 两种表示法并存必然对不上（同一件事写两套算法），所以迁完就把 titleScale 彻底扔掉，
@@ -61,11 +85,12 @@ const setCfg = (k, v) => { try { GM_setValue(k, v); } catch (e) { console.warn('
 (function migrateTitleSize(){
   const px = (base, scale) => Math.round((base === undefined ? DEF.fontSize : base) * scale / 100);
   try {
-    if (GM_getValue('titleSize') === undefined && GM_getValue('titleScale') !== undefined)
-      GM_setValue('titleSize', px(GM_getValue('fontSize'), GM_getValue('titleScale')));
-    const ps = GM_getValue('presets');
+    // 走 rawCfg/setCfg，别再直接摸 GM_* —— 那两个在 iOS 上根本不存在
+    if (rawCfg('titleSize') === undefined && rawCfg('titleScale') !== undefined)
+      setCfg('titleSize', px(rawCfg('fontSize'), rawCfg('titleScale')));
+    const ps = rawCfg('presets');
     if (Array.isArray(ps) && ps.some(p => p && p.style && p.style.titleScale !== undefined))
-      GM_setValue('presets', ps.map(p => {
+      setCfg('presets', ps.map(p => {
         if (!p || !p.style || p.style.titleScale === undefined) return p;
         const style = { ...p.style };
         style.titleSize = px(style.fontSize, style.titleScale);
@@ -1045,7 +1070,9 @@ input[type=text]:disabled{opacity:.5}
 .flist button i{font-style:normal;font-size:10px;opacity:.6;font-family:-apple-system,sans-serif;margin-left:auto}
 .sub{font-size:10px;color:var(--dim);margin:10px 0 4px;letter-spacing:.08em}
 .fs{display:flex;gap:8px;align-items:center}
-.fs input[type=range]{flex:1}
+/* min-width:0 —— 少了它，range 撑在自己 129px 的固有宽度上不肯缩，
+   「滑块＋数字框＋常中粗」这一行就顶破 308px 的侧栏，底下冒出一条横向滚动条。 */
+.fs input[type=range]{flex:1;min-width:0}
 .fs input[type=number]{width:62px;border:1px solid var(--line);border-radius:4px;padding:5px 6px;
      font:13px inherit;text-align:center;color:var(--fg);background:var(--field)}
 .fs .val{width:44px;text-align:right;font-size:11px;color:var(--dim)}
@@ -1636,7 +1663,10 @@ function openPanel(text){
           const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(files[0]);
         });
         const n = await installPack(text);
-        tipEl.textContent = `装好了：${n} 套（横竖各一张）。以后不用再导。`;
+        // 收尾这句必须照事实说 —— 存不下的时候「以后不用再导」就是句谎话
+        tipEl.textContent = installPack.persisted
+          ? `装好了：${n} 套（横竖各一张）。以后不用再导。`
+          : `这次能用：${n} 套。但存不下来（浏览器给脚本的空间不够装这么大的包），换一页要重导。`;
         buildPapers(); sync(); draw();
       } catch (e){ tipEl.textContent = '这个素材包读不了：' + e.message; }
     };
@@ -1878,7 +1908,11 @@ async function installPack(text){
   const data = JSON.parse(text);
   const sets = (data.sets || []).filter(s => s.key && (s.portrait || s.landscape));
   if (!sets.length) throw new Error('这个文件里没有可用的信纸');
-  setCfg('packs', sets); _packs = null; packImgs.clear(); meanCache.clear();
+  // 先把这一份记在内存里，再谈存不存得下 —— 存不下（localStorage 只有 ~5MB）也不该
+  // 让刚导进来的纸当场消失。存不下的话回头告诉用户「这次能用，下次还得再导」。
+  const kept = setCfg('packs', sets);
+  _packs = sets; packImgs.clear(); meanCache.clear();
+  installPack.persisted = kept;
   // 等图真的解码完再说「装好了」，不然点开一张纸是白的
   await Promise.all(sets.flatMap(s => ['portrait','landscape'].map(o => new Promise(r => {
     const im = packImg(s.key, o); if (!im || im.complete) return r();
@@ -1931,14 +1965,39 @@ document.addEventListener('keydown', e => {
   }
 }, true);
 
+// 三指轻点 = 手机上的 Alt+Q。
+// 🔴 手机没有 Alt 键，而 iOS 的 Userscripts **不支持 GM_registerMenuCommand**，
+//    也就没有脚本菜单可点 —— 空手起稿在手机上原本一个入口都没有。
+//    选三指：网页几乎用不到这个手势，iOS 系统的三指手势只在可编辑区域里管撤销/重做，
+//    所以在输入框里一律让开。
+let tri = null;
+document.addEventListener('touchstart', e => {
+  if (mask) { tri = null; return; }
+  const t = e.target;
+  const editing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+  tri = (e.touches.length === 3 && !editing)
+    ? { t: Date.now(), x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+}, true);
+document.addEventListener('touchend', e => {
+  if (!tri || e.touches.length) return;          // 还有手指没抬起来，等
+  const { t, x, y } = tri; tri = null;
+  if (mask || Date.now() - t > 700) return;      // 按久了就不算「轻点」
+  const c = e.changedTouches[0];
+  if (c && Math.hypot(c.clientX - x, c.clientY - y) > 40) return;   // 划走了也不算
+  if (pill) pill.hidden = true;
+  openPanel(String(getSelection() || '').trim());
+}, true);
+
 // 自检：脚本要么大声说话，要么就该被看见。别再出现「选中没反应，但不知道死在哪」。
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.1',
+    '脚本版本：0.16.2',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
-    `GM_download：${typeof GM_download === 'function' ? '有' : '没有（油猴没授权？）'}`,
+    `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,
+    `设置存在哪：${hasGM ? 'GM 存储（所有网站共用一份）' : '这个网站自己的 localStorage（跨网站不共享，得每个站各设一次）'}`,
+    `脚本菜单：${typeof GM_registerMenuCommand === 'function' ? '有' : '没有（iOS 的 Userscripts 就没有）—— 空手起稿请用三指轻点'}`,
     `面板容器：${host && host.isConnected ? '已挂上' : '还没挂（选中文字才会建）'}`,
     `你现在选中了：${String(window.getSelection() || '').trim().slice(0, 24) || '（什么都没选）'}`,
     `系统里能用的字：${FONTS.filter(fontAvailable).map(f => f.name).join('、')}`,
@@ -1946,7 +2005,7 @@ function selfCheck(){
     `你自己加的纸：${cfg('myPapers').length} 张　字：${cfg('myFonts').length} 款`,
     '',
     '看到这个框，说明脚本在这一页是活的。',
-    '不用先选文字：按 Alt+Q，或者用油猴菜单里的「写点什么」，直接开一张白纸。',
+    '不用先选文字就开一张白纸：电脑按 Alt+Q 或用油猴菜单；手机三指轻点屏幕。',
     '选中文字没反应，多半是这页在你装脚本之前就开着了 —— 按 F5。',
     '字体装了却还是灰的 —— 要完全退出浏览器再开，Chrome 系不热加载字体列表。',
   ].join('\n'));
@@ -1968,7 +2027,7 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.1 已在这一页启动。选中文字会冒出「摘」；不选也行，按 Alt+Q 开一张白纸。');
+console.log('[拾句] 0.16.2 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES,
