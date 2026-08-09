@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.3
+// @version      0.16.4
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
@@ -25,6 +25,21 @@
 /* eslint-disable no-undef */
 (function () {
 'use strict';
+
+// ════════════════════════════════════════════════════════════════════
+//  同一页只许有一份
+// ════════════════════════════════════════════════════════════════════
+// 这个文件有两个去处：① 用户脚本（篡改猴注入到任意网页）② 酒馆扩展（酒馆自己
+// 用 <script type="module"> 加载）。装了扩展的人如果同时还开着用户脚本，
+// 酒馆那一页上就会同时跑两份 —— 两套监听、两颗「摘」、两个面板。
+// 🔑 标记必须放在 DOM 上：篡改猴的沙箱和页面**不共享 window**，但共享 document。
+const MARK = 'shijuRunning';
+if (document.documentElement.dataset[MARK]) {
+  console.log('[拾句] 这一页已经有一份在跑了（' +
+    document.documentElement.dataset[MARK] + '），这一份让开。');
+  return;
+}
+document.documentElement.dataset[MARK] = '0.16.4';
 
 // ════════════════════════════════════════════════════════════════════
 //  0. 设置（GM 存储是跨网站共享的 —— 换纸换字设一次，全网通用）
@@ -1995,11 +2010,59 @@ document.addEventListener('touchend', e => {
   openPanel(String(getSelection() || '').trim());
 }, true);
 
+// ════════════════════════════════════════════════════════════════════
+//  酒馆（SillyTavern）里的入口
+// ════════════════════════════════════════════════════════════════════
+// 装成酒馆扩展时没有脚本管理器，也就没有那个「写点什么」的菜单。
+// 在酒馆的「扩展」面板里挂一块。**判据是那两个容器在不在** ——
+// 普通网页上没有这两个 id，下面这段等于不存在，一行也不会执行到。
+function mountSillyTavern(){
+  if (document.getElementById('shiju_st_block')) return true;
+  const host = document.getElementById('extensions_settings2')
+            || document.getElementById('extensions_settings');
+  if (!host) return false;
+
+  const box = document.createElement('div');
+  box.id = 'shiju_st_block';
+  box.className = 'shiju-st inline-drawer';
+  box.innerHTML = `
+    <div class="inline-drawer-toggle inline-drawer-header">
+      <b>拾句 · 网页摘录成图</b>
+      <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+    </div>
+    <div class="inline-drawer-content">
+      <div style="font-size:.9em;opacity:.8;line-height:1.7;margin-bottom:8px">
+        选中一段回复 → 旁边冒出「摘」；或者按 <b>Alt+Q</b>（手机三指轻点）直接开一张白纸。
+      </div>
+      <div class="menu_button menu_button_icon" id="shiju_st_open">
+        <span>写点什么（开一张白纸）</span>
+      </div>
+    </div>`;
+  host.append(box);
+  box.querySelector('#shiju_st_open').addEventListener('click', () => {
+    if (mask) return;
+    openPanel(String(getSelection() || '').trim());
+  });
+  // 抽屉的展开/收起用酒馆自己的样式类，它的脚本会接管；接管不到就自己兜一下
+  const head = box.querySelector('.inline-drawer-toggle');
+  head.addEventListener('click', () => {
+    const body = box.querySelector('.inline-drawer-content');
+    if (body) body.style.display = body.style.display === 'none' ? '' : 'none';
+  });
+  console.log('[拾句] 已挂进酒馆的「扩展」面板。');
+  return true;
+}
+// 酒馆那块面板不一定比脚本先建好，探几次就放弃（普通网页上就是探几次然后安静收工）
+(function waitForSillyTavern(n){
+  if (mountSillyTavern() || n <= 0) return;
+  setTimeout(() => waitForSillyTavern(n - 1), 1000);
+})(15);
+
 // 自检：脚本要么大声说话，要么就该被看见。别再出现「选中没反应，但不知道死在哪」。
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.3',
+    '脚本版本：0.16.4',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,
@@ -2034,7 +2097,7 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.3 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
+console.log('[拾句] 0.16.4 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES,

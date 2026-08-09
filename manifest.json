@@ -1,0 +1,11 @@
+{
+    "display_name": "拾句 · 网页摘录成图",
+    "loading_order": 100,
+    "requires": [],
+    "optional": [],
+    "js": "shiju.user.js",
+    "author": "willwefind & Ciel",
+    "version": "0.16.4",
+    "homePage": "https://github.com/willwefind/shiju",
+    "auto_update": true
+}
