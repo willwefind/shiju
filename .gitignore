@@ -1,0 +1,16 @@
+# 素材包是各人自己的图，不入库
+*.pack.json
+my-papers*/
+papers/
+
+# 字体原档太大，只收 fonts/ 里明确可再分发的那些
+字体_双击安装/
+fonts-subset/
+*.zip
+
+# 自测与临时产物
+_*.html
+_*.jpg
+_*.png
+out/
+node_modules/
