@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.7
+// @version      0.16.8
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @match        *://*/*
@@ -39,7 +39,7 @@ if (document.documentElement.dataset[MARK]) {
     document.documentElement.dataset[MARK] + '），这一份让开。');
   return;
 }
-document.documentElement.dataset[MARK] = '0.16.7';
+document.documentElement.dataset[MARK] = '0.16.8';
 
 // ════════════════════════════════════════════════════════════════════
 //  0. 设置（GM 存储是跨网站共享的 —— 换纸换字设一次，全网通用）
@@ -2000,7 +2000,11 @@ const storedBytes = () => cfg('myPapers').reduce((a,p) => a + p.data.length, 0)
                         + cfg('myFonts').reduce((a,f) => a + f.data.length, 0);
 
 // 装素材包。抽成独立函数，好让自测直接喂真文件进来验（不用去点文件选择框）。
-async function installPack(text){
+// opt.warm === false：装完**不**预解码。
+// 🔴 预热那一步在浏览器里是必要的（导完包马上点纸，不预热会点开一张白的），
+//    但它的代价是把 20 套 × 竖横两版 = 40 张 2160×2700 全解进内存 ≈ 930MB。
+//    服务端（MCP）没人点纸，只在真要画的那一刻取一张，所以让它能关掉。
+async function installPack(text, opt = {}){
   const data = JSON.parse(text);
   const sets = (data.sets || []).filter(s => s.key && (s.portrait || s.landscape));
   if (!sets.length) throw new Error('这个文件里没有可用的信纸');
@@ -2010,10 +2014,11 @@ async function installPack(text){
   _packs = sets; packImgs.clear(); meanCache.clear();
   installPack.persisted = kept;
   // 等图真的解码完再说「装好了」，不然点开一张纸是白的
-  await Promise.all(sets.flatMap(s => ['portrait','landscape'].map(o => new Promise(r => {
-    const im = packImg(s.key, o); if (!im || im.complete) return r();
-    im.onload = r; im.onerror = r;
-  }))));
+  if (opt.warm !== false)
+    await Promise.all(sets.flatMap(s => ['portrait','landscape'].map(o => new Promise(r => {
+      const im = packImg(s.key, o); if (!im || im.complete) return r();
+      im.onload = r; im.onerror = r;
+    }))));
   return sets.length;
 }
 
@@ -2136,7 +2141,7 @@ function mountSillyTavern(){
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.7',
+    '脚本版本：0.16.8',
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,
@@ -2171,11 +2176,11 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.7 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
+console.log('[拾句] 0.16.8 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
 window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES, DEF,
-                   installPack, packs, paperMean, contrast, bestInk, hex2rgb, inkOf, allInks,
+                   installPack, packs, packImg, paperMean, contrast, bestInk, hex2rgb, inkOf, allInks,
                    titleStack, familyOf, TAGLINES, wrapVertical, drawColumn, alignOffset, vAdvance,
                    STYLE_KEYS, BUILTIN_PRESETS,
                    openPanel, selfCheck, trySelection };
