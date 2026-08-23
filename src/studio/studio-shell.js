@@ -173,6 +173,8 @@ const pickFiles = accept => new Promise(res => {
 function openPanel(text, init = {}){
   // 语言先落定再建面板：面板 HTML 是开面板时现拼的，t() 在拼的那一刻取词
   setStudioLocale(init.locale || 'auto');
+  // 嵌入方可为可再分发西文字体提供文件 URL（{latinId: url}）——选中才装载
+  const embedFontUrls = (init.fontUrls && typeof init.fontUrls === 'object') ? init.fontUrls : {};
   ui();
   if (mask) mask.remove();
   const blank = !String(text || '').trim();     // 空手起稿（写日记随笔），不是从网页上摘的
@@ -735,13 +737,28 @@ function openPanel(text, init = {}){
       box.append(b);
     }
 
-    // 西文字体：只列真装了的，每行用它自己写 "Aa Bb 0123"
+    // 西文字体：列真装了的；嵌入方给了文件 URL 的也列（选中那一刻才装载，§9.3）
     const lb = q('#latin'); lb.textContent = '';
     for (const l of LATIN){
       const hit = l.probes.length ? resolveFont(l) : null;
-      if (l.probes.length && !hit) continue;
-      lb.append(fontRow(l.id, l.id === 'none' ? t('font.noneLatin') : `${l.name} — Aa Bb 0123`,
-                        hit ? `"${hit}"` : null, l.hint ? tName('hint', l.id, l.hint) : ''));
+      const url = !hit && l.probes.length ? embedFontUrls[l.id] : null;
+      if (l.probes.length && !hit && !url) continue;
+      const row = fontRow(l.id, l.id === 'none' ? t('font.noneLatin') : `${l.name} — Aa Bb 0123`,
+                        hit ? `"${hit}"` : null, l.hint ? tName('hint', l.id, l.hint) : '');
+      if (url) row.addEventListener('click', async e => {
+        e.stopPropagation();               // 拦下通用委托，先装字再落选
+        tipEl.textContent = t('font.urlLoading', { name: l.name });
+        try {
+          await ensureUrlFont(l.probes[0], url);
+          if (!alive()) return;
+          st.latinFont = l.id; setCfg('latinFont', st.latinFont);
+          buildFonts(); sync(); draw();
+          tipEl.textContent = '';
+        } catch (err) {
+          if (alive()) tipEl.textContent = t('font.urlFailed', { name: l.name });
+        }
+      });
+      lb.append(row);
     }
 
     // 标题字体：中文和英文都能挑（挑了英文字，汉字会自动落回正文的中文字体）

@@ -10,9 +10,11 @@
 // 读 cfg('latinFont')，familyOf/cjkStack 读 cfg('myFonts')；量宽走 PLATFORM）。
 const FONTS = [
   { id:'sys',      name:'系统宋体',  probes:[] },
-  { id:'zhuque',   name:'朱雀仿宋',  probes:['Zhuque Fangsong (technical preview)','Zhuque Fangsong (technical prev','朱雀仿宋（预览测试版）','朱雀仿宋'] },
-  { id:'jinghua',  name:'京華老宋',  probes:['KingHwaOldSong','京華老宋體','京華老宋体'] },
-  { id:'huiwen',   name:'汇文明朝',  probes:['Huiwen-mincho','汇文明朝体'] },
+  // 各条 probes 末尾的英文名是 Our Dialogues 阅读器捆包字体的 @font-face 族名 ——
+  // 嵌入阅读器时靠它认出「阅读器已经带了这款字」，一个文件都不用重复装（去重清单 §9.1）
+  { id:'zhuque',   name:'朱雀仿宋',  probes:['Zhuque Fangsong (technical preview)','Zhuque Fangsong (technical prev','朱雀仿宋（预览测试版）','朱雀仿宋','Zhuque Fangsong'] },
+  { id:'jinghua',  name:'京華老宋',  probes:['KingHwaOldSong','京華老宋體','京華老宋体','KingHwa OldSong'] },
+  { id:'huiwen',   name:'汇文明朝',  probes:['Huiwen-mincho','汇文明朝体','Huiwen Mincho'] },
   { id:'jinshu',   name:'寒蝉锦书',  probes:['寒蝉锦书宋','寒蟬錦書宋','ChillJinshuSong'] },
   { id:'chillhuo', name:'寒蝉活宋',  probes:['ChillHuoSong_F','寒蝉活宋体__'] },
   { id:'duanhei',  name:'寒蝉端黑',  probes:['寒蝉端黑宋Pro','寒蟬端黑宋Pro','ChillDuanHeiSongPro'] },
@@ -114,5 +116,17 @@ async function ensureCustomFonts(){
     try { const face = new FontFace(f.id, `url(${f.data})`); await face.load(); document.fonts.add(face); loadedCustom.add(f.id); }
     catch (e){ console.warn('[拾句] 装不上字体', f.name, e.message); }
   }
+}
+
+// 嵌入方给可再分发西文字体提供文件 URL 时，**选中那一刻**才真正装载（§9.3 懒加载）。
+// 装完清探测缓存，让 hasFont 重探出「装上了」。用户脚本路径不带 URL，此函数永不被调。
+const urlFontLoaded = new Set();
+async function ensureUrlFont(family, url){
+  if (urlFontLoaded.has(family)) return;
+  const face = new FontFace(family, 'url("' + url + '")');
+  await face.load();
+  document.fonts.add(face);
+  urlFontLoaded.add(family);
+  probeCache.clear();
 }
 

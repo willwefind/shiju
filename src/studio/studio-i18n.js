@@ -85,6 +85,8 @@ const STUDIO_I18N = {
     'font.addTitle': '存在油猴里，所有网站通用',
     'font.tooBig': '{name} 有 {mb}MB，太大存不进油猴。请用裁过子集的版本，或直接双击装进系统。',
     'font.installFail': '装不上：{name}',
+    'font.urlLoading': '正在装载 {name}…',
+    'font.urlFailed': '{name} 装载失败。',
     'font.notInstalledTip': '这款字系统里没装。双击字体文件装进 Windows（装完要**完全重开浏览器**），或按下面的「＋ 从文件装」。',
 
     // ── 色 ───────────────────────────────────────────────────────
@@ -231,6 +233,8 @@ const STUDIO_I18N = {
     'font.addTitle': 'Stored in the userscript manager, works on every site',
     'font.tooBig': '{name} is {mb}MB — too big to store in the userscript manager. Use a subsetted version, or double-click the file to install it system-wide.',
     'font.installFail': 'Could not install: {name}',
+    'font.urlLoading': 'Loading {name}…',
+    'font.urlFailed': 'Could not load {name}.',
     'font.notInstalledTip': 'This font is not installed. Double-click the font file to install it into Windows (then fully restart the browser), or use “＋ Install a font from file” below.',
 
     // ── 色 ───────────────────────────────────────────────────────
