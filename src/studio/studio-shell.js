@@ -167,17 +167,21 @@ const pickFiles = accept => new Promise(res => {
   i.onchange = () => res([...i.files]); i.click();
 });
 
-function openPanel(text){
+// init 是给嵌入方（比如阅读器）的缝：{ title, source, date } 预填内容，
+// onClose 在面板真正关掉后回调一次（嵌入方拿它恢复自己的阅读位置/焦点）。
+// 不传 init 时行为与从前完全相同 —— 网页选中路径一个字都没变。
+function openPanel(text, init = {}){
   ui();
   if (mask) mask.remove();
   const blank = !String(text || '').trim();     // 空手起稿（写日记随笔），不是从网页上摘的
   const st = {
     text: text || '',
     // 空手写的时候，出处默认给空 —— 那是自己写的话，不是从这个网页摘的
-    source: blank ? '' : (document.title || location.hostname).slice(0, 200),
+    source: init.source != null ? String(init.source).slice(0, 200)
+          : blank ? '' : (document.title || location.hostname).slice(0, 200),
     headText: cfg('headText'),
-    date  : today(),
-    title: '',
+    date  : init.date != null ? String(init.date) : today(),
+    title: init.title != null ? String(init.title) : '',
     paper: cfg('paper'), font: cfg('font'), fontSize: cfg('fontSize'), ink: cfg('ink'),
     orient: cfg('orient'), pages: cfg('pages'),
     weight: cfg('weight'), latinFont: cfg('latinFont'),
@@ -833,7 +837,12 @@ function openPanel(text){
   q('#hd').oninput = () => { setCfg('headText', q('#hd').value); draw(); };
   q('#ti').oninput = draw;
 
-  const close = () => { if (mask){ mask.remove(); mask = null; } };
+  const close = () => {
+    if (!mask) return;
+    mask.remove(); mask = null;
+    // onClose 只在真关掉的那一次响 —— close 本身保持幂等
+    if (typeof init.onClose === 'function') try { init.onClose(); } catch {}
+  };
   q('#close').onclick = close;
   mask.onclick = e => { if (e.target === mask) close(); };
   document.addEventListener('keydown', function esc(e){
