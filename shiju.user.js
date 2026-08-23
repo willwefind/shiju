@@ -4,6 +4,7 @@
 // @version      0.16.8
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
+// @license      AGPL-3.0
 // @match        *://*/*
 // @updateURL    https://raw.githubusercontent.com/willwefind/shiju/main/shiju.user.js
 // @downloadURL  https://raw.githubusercontent.com/willwefind/shiju/main/shiju.user.js

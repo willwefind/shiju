@@ -839,6 +839,7 @@ SillyTavern\data\default-user\extensions\shiju\papers\letterpaper-20sets.pack.js
 
 ## 授权
 
-脚本本体 MIT，见 [LICENSE](LICENSE)。
-`fonts/` 下各字体按其自带的 OFL / Apache 协议，协议原文随字体一起放着。
+脚本本体 AGPL-3.0，见 [LICENSE](LICENSE)。
+`fonts/` 下各字体**不随此重许可**，仍按其自带的 OFL / Apache 协议，协议原文随字体一起放着
+（另见 [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)）。
 `papers/` 下的 20 套信纸是本仓作者自己的素材，可自由使用，含商用，不必署名。
