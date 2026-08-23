@@ -1108,6 +1108,341 @@ function renderPage(canvas, st, plan, idx){
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  Studio 界面语言（zh-CN / en）
+// ════════════════════════════════════════════════════════════════════
+// 只管 Studio Shell 的界面文字（面板、药丸、提示、确认框）。
+// 内容与内容默认值不在此列：题头默认「摘 录」、出处前缀「—— 」、提示句
+// TAGLINES 是**作品上的字**，不是界面文字，保持原样（已声明的取舍）。
+// 适配器注入：嵌入方开面板时传 init.locale（'zh-CN' | 'en' | 'auto'），
+// 用户脚本自己走 auto = 浏览器语言（zh-* → zh-CN，其余 → en）。
+//
+// 铁律（与阅读器 Phase 1 相同）：
+//   1. zh-CN 词典的值必须与清扫前的界面原文**逐字相同** —— 中文界面一个字都不变；
+//   2. 新增任何可见字符串必须 zh + en 双词条，键名平衡、{参数} 平衡
+//      （tests/studio-i18n.test.mjs 站岗）；
+//   3. 参数用 {name} 花括号占位，t() 做整串替换，不做任何格式化。
+
+const STUDIO_I18N = {
+  'zh-CN': {
+    // ── 药丸 / 面板骨架 ──────────────────────────────────────────
+    'pill.clip': '摘',
+    'app.title': '拾 句',
+    'theme.auto': '跟随', 'theme.day': '白天', 'theme.night': '黑夜',
+    'tab.text': '文', 'tab.paper': '纸', 'tab.font': '字', 'tab.ink': '色', 'tab.layout': '版',
+    'act.save': '存 图', 'act.copy': '复制这张', 'act.close': '关闭',
+    'act.store': '存',
+
+    // ── 通用小件（开关 / 字重 / 对齐 / 排向）──────────────────────
+    'sw.show': '显示', 'sw.hide': '隐藏',
+    'weight.regular': '常', 'weight.medium': '中', 'weight.bold': '粗',
+    'align.left': '左', 'align.center': '中', 'align.right': '右',
+    'dir.horizontal': '横排', 'dir.vertical': '竖排',
+    'tip.renameDelete': '双击改名 · 右键删掉',
+    'tip.rightDelete': '右键删掉',
+
+    // ── 文 ───────────────────────────────────────────────────────
+    'text.title': '标题',
+    'text.sizeWeight': '字号 · 字重',
+    'text.titlePh': '留空就没有标题',
+    'text.body': '内容',
+    'text.source': '出处',
+    'text.sourcePrefixPh': '前缀',
+    'text.date': '日期',
+    'text.header': '题头',
+    'text.headerPh': '摘 录 / 日记 / 随笔 …',
+    'text.rules': '三道线要不要',
+    'text.ruleHead': '题头下', 'text.ruleTitle': '标题下', 'text.ruleFoot': '页脚',
+
+    // ── 纸 ───────────────────────────────────────────────────────
+    'paper.builtin': '内置（代码画的）',
+    'paper.pack': '素材包',
+    'paper.packEmpty': '素材包（还没导，按下面的「＋包」）',
+    'paper.mine': '我加的',
+    'paper.bright': '纸张明暗',
+    'paper.groupBold': '浓色', 'paper.groupSoft': '柔色',
+    'paper.packTileTitle': '{name}（{group}）',
+    'paper.addTile': '＋',
+    'paper.addTileTitle': '把你自己的信纸图丢进来',
+    'paper.addPack': '＋包',
+    'paper.addPackTitle': '导入信纸素材包（.json），导一次就常驻，所有网站通用',
+    'paper.importing': '正在收纸…',
+    'paper.defaultName': '我的纸{n}',
+    'paper.oneFail': '这张收不进来：{name}',
+    'paper.importedAll': '收了 {n} 张（已占 {mb}MB）。双击一张纸可以改名，右键删掉。',
+    'paper.importedSome': '{total} 张里收进来 {n} 张（已占 {mb}MB）。双击改名，右键删掉。',
+    'paper.storageFull': ' 存的东西有点多了，建议删掉些不用的。',
+    'paper.packReading': '正在读素材包…',
+    'paper.packInstalled': '装好了：{n} 套（横竖各一张）。以后不用再导。',
+    'paper.packVolatile': '这次能用：{n} 套。但存不下来（浏览器给脚本的空间不够装这么大的包），换一页要重导。',
+    'paper.packBad': '这个素材包读不了：{msg}',
+    'paper.renamePrompt': '这张纸叫什么？',
+    'paper.deleteConfirm': '删掉「{name}」这张纸？',
+    'paper.autoInkSwapped': '这张纸太浓，黑字看不清，墨色替你换成了「{name}」——不喜欢就自己再挑。',
+
+    // ── 字 ───────────────────────────────────────────────────────
+    'font.body': '正文字体',
+    'font.latin': '西文字体（只管字母和数字）',
+    'font.title': '标题字体',
+    'font.sameAsBody': '同正文',
+    'font.noneLatin': '不指定（跟着中文字体走）',
+    'font.hintMissing': '没装',
+    'font.hintCustom': '自装',
+    'font.hintCjk': '中文',
+    'font.hintLatin': '西文',
+    'font.missingTitle': '系统里没装这款字',
+    'font.add': '＋ 从文件装一款字',
+    'font.addTitle': '存在油猴里，所有网站通用',
+    'font.tooBig': '{name} 有 {mb}MB，太大存不进油猴。请用裁过子集的版本，或直接双击装进系统。',
+    'font.installFail': '装不上：{name}',
+    'font.notInstalledTip': '这款字系统里没装。双击字体文件装进 Windows（装完要**完全重开浏览器**），或按下面的「＋ 从文件装」。',
+
+    // ── 色 ───────────────────────────────────────────────────────
+    'ink.body': '正文墨色',
+    'ink.meta': '题头/出处/日期的颜色',
+    'ink.quote': '引号里那段话的颜色',
+    'ink.custom': '自己调',
+    'ink.customHint': '双击改名 · 右键删',
+    'ink.namePh': '起个名，比如「黄昏」',
+    'ink.bright': '墨色明暗',
+    'ink.followPaper': '跟着纸',
+    'ink.followBody': '跟正文',
+    'ink.defaultName': '自配{n}',
+    'ink.saved': '存好了：「{name}」{c}。双击它可以改名，右键删掉。',
+    'ink.renamePrompt': '这支墨叫什么？',
+    'ink.deleteConfirm': '删掉「{name}」这支墨？',
+
+    // ── 版 ───────────────────────────────────────────────────────
+    'preset.label': '版式预设',
+    'preset.namePh': '给当前这套版式起个名',
+    'preset.builtinTitle': '内置排版',
+    'preset.defaultName': '我的版式{n}',
+    'preset.applied': '换成「{name}」了。内容没动。',
+    'preset.saved': '存好了：「{name}」。双击改名，右键删掉。',
+    'preset.renamePrompt': '这套版式叫什么？',
+    'preset.deleteConfirm': '删掉「{name}」这套版式？',
+    'layout.bodyDir': '正文排向',
+    'layout.titleDir': '标题排向',
+    'layout.bodyAlign': '正文对齐',
+    'layout.titleAlign': '标题对齐',
+    'layout.orient': '版式',
+    'layout.pages': '拆成几张',
+    'layout.pagesAuto': '自动',
+    'layout.offset': '整块位移',
+    'layout.offsetHint': '在右边预览图上直接拖',
+    'layout.offsetVal': '左右 {x} · 上下 {y}',
+    'layout.offsetNone': '没挪过',
+    'layout.offsetReset': '归位',
+
+    // ── 预览 / 计数 ──────────────────────────────────────────────
+    'count.pages': '{n} 张　{w}×{h}　导出 {ew}×{eh}',
+    'count.notesGlue': '　—— ',
+    'count.notesJoin': '；',
+    'count.grewNote': '这么多字放不进这么少张，整叠一起加高了',
+    'count.fewerNote': '要 {want} 张，但内容只够 {got} 张',
+    'count.renderFail': '画不出来：{msg}',
+
+    // ── 存 / 复制 ────────────────────────────────────────────────
+    'save.working': '正在存 {n} 张…',
+    'save.fileOne': '摘录_{stamp}.jpg',
+    'save.fileMulti': '摘录_{stamp}_{i}of{n}.jpg',
+    'save.doneFallback': '存了 {n} 张，其中 {fb} 张进不了子目录，直接落在下载目录。',
+    'save.done': '已存 {n} 张到：下载目录/{dir}',
+    'copy.donePage': '已复制第 {n} 张',
+    'copy.done': '已复制到剪贴板',
+    'copy.denied': '这个网站不给复制权限，请用「存图」',
+
+    // ── 登记表显示名（核心数据不动，显示时查这里；用户自造的走兜底）──
+    'orient.portrait': '竖版', 'orient.landscape': '横版',
+    'paper.rice': '宣纸', 'paper.cream': '米黄', 'paper.kraft': '牛皮',
+    'paper.linen': '布纹', 'paper.black': '纯黑',
+    'preset.p_zhai': '摘录', 'preset.p_riji': '日记', 'preset.p_xin': '信件', 'preset.p_shu': '竖排',
+    'ink.black': '墨黑', 'ink.sepia': '深褐', 'ink.indigo': '靛青', 'ink.crimson': '绛红',
+    'ink.pine': '松绿', 'ink.ash': '烟灰', 'ink.paper': '纸白', 'ink.moon': '月白',
+    'ink.gold': '浅金', 'ink.rose': '藕荷', 'ink.jade': '霜青',
+    'font.sys': '系统宋体', 'font.zhuque': '朱雀仿宋', 'font.jinghua': '京華老宋',
+    'font.huiwen': '汇文明朝', 'font.jinshu': '寒蝉锦书', 'font.chillhuo': '寒蝉活宋',
+    'font.duanhei': '寒蝉端黑', 'font.nanxi': '南西油墨', 'font.nano': '纳米老宋',
+    'font.chaohua': '朝華標題', 'font.chaohuaB': '朝華標題B', 'font.dinglie': '鼎猎宋刻',
+    'font.pixel': '像素',
+    'hint.fellEng': '十七世纪活字', 'hint.fellPica': '十七世纪活字',
+    'hint.elite': '打字机', 'hint.limelight': '装饰体', 'hint.uncial': '安色尔',
+    'hint.smokum': '西部厚板', 'hint.beau': '花体', 'hint.jim': '哥特手写',
+    'hint.tages': '手写', 'hint.coral': '像素',
+  },
+  'en': {
+    // ── 药丸 / 面板骨架 ──────────────────────────────────────────
+    'pill.clip': 'Clip',
+    'app.title': 'Shiju',
+    'theme.auto': 'System', 'theme.day': 'Day', 'theme.night': 'Night',
+    'tab.text': 'Text', 'tab.paper': 'Paper', 'tab.font': 'Type', 'tab.ink': 'Ink', 'tab.layout': 'Layout',
+    'act.save': 'Save', 'act.copy': 'Copy this one', 'act.close': 'Close',
+    'act.store': 'Save',
+
+    // ── 通用小件（开关 / 字重 / 对齐 / 排向）──────────────────────
+    'sw.show': 'Show', 'sw.hide': 'Hide',
+    'weight.regular': 'Regular', 'weight.medium': 'Medium', 'weight.bold': 'Bold',
+    'align.left': 'Left', 'align.center': 'Center', 'align.right': 'Right',
+    'dir.horizontal': 'Horizontal', 'dir.vertical': 'Vertical',
+    'tip.renameDelete': 'Double-click to rename · right-click to delete',
+    'tip.rightDelete': 'Right-click to delete',
+
+    // ── 文 ───────────────────────────────────────────────────────
+    'text.title': 'Title',
+    'text.sizeWeight': 'Size · weight',
+    'text.titlePh': 'Leave empty for no title',
+    'text.body': 'Body',
+    'text.source': 'Source',
+    'text.sourcePrefixPh': 'Prefix',
+    'text.date': 'Date',
+    'text.header': 'Header',
+    'text.headerPh': 'Excerpt / Diary / Notes …',
+    'text.rules': 'Divider lines',
+    'text.ruleHead': 'Below header', 'text.ruleTitle': 'Below title', 'text.ruleFoot': 'Footer',
+
+    // ── 纸 ───────────────────────────────────────────────────────
+    'paper.builtin': 'Built-in (drawn by code)',
+    'paper.pack': 'Paper packs',
+    'paper.packEmpty': 'Paper packs (none yet — use “＋Pack” below)',
+    'paper.mine': 'My papers',
+    'paper.bright': 'Paper brightness',
+    'paper.groupBold': 'bold', 'paper.groupSoft': 'soft',
+    'paper.packTileTitle': '{name} ({group})',
+    'paper.addTile': '＋',
+    'paper.addTileTitle': 'Drop in your own paper images',
+    'paper.addPack': '＋Pack',
+    'paper.addPackTitle': 'Import a paper pack (.json) — import once, it stays for every site',
+    'paper.importing': 'Importing paper…',
+    'paper.defaultName': 'My paper {n}',
+    'paper.oneFail': 'Could not import: {name}',
+    'paper.importedAll': 'Imported {n} ({mb}MB used). Double-click a paper to rename, right-click to delete.',
+    'paper.importedSome': 'Imported {n} of {total} ({mb}MB used). Double-click to rename, right-click to delete.',
+    'paper.storageFull': ' Storage is getting full — consider deleting some unused items.',
+    'paper.packReading': 'Reading the pack…',
+    'paper.packInstalled': 'Installed: {n} sets (portrait and landscape each). No need to import again.',
+    'paper.packVolatile': 'Usable this time: {n} sets, but they could not be stored (the browser gives scripts too little space for a pack this big) — re-import on the next page.',
+    'paper.packBad': 'Could not read this pack: {msg}',
+    'paper.renamePrompt': 'Name this paper?',
+    'paper.deleteConfirm': 'Delete the paper “{name}”?',
+    'paper.autoInkSwapped': 'This paper is too dark for black text, so the ink was switched to “{name}” — pick another if you prefer.',
+
+    // ── 字 ───────────────────────────────────────────────────────
+    'font.body': 'Body font',
+    'font.latin': 'Latin font (letters and digits only)',
+    'font.title': 'Title font',
+    'font.sameAsBody': 'Same as body',
+    'font.noneLatin': 'None (follow the Chinese font)',
+    'font.hintMissing': 'missing',
+    'font.hintCustom': 'custom',
+    'font.hintCjk': 'Chinese',
+    'font.hintLatin': 'Latin',
+    'font.missingTitle': 'This font is not installed on your system',
+    'font.add': '＋ Install a font from file',
+    'font.addTitle': 'Stored in the userscript manager, works on every site',
+    'font.tooBig': '{name} is {mb}MB — too big to store in the userscript manager. Use a subsetted version, or double-click the file to install it system-wide.',
+    'font.installFail': 'Could not install: {name}',
+    'font.notInstalledTip': 'This font is not installed. Double-click the font file to install it into Windows (then fully restart the browser), or use “＋ Install a font from file” below.',
+
+    // ── 色 ───────────────────────────────────────────────────────
+    'ink.body': 'Body ink',
+    'ink.meta': 'Header / source / date color',
+    'ink.quote': 'Quoted text color',
+    'ink.custom': 'Mix your own',
+    'ink.customHint': 'double-click to rename · right-click to delete',
+    'ink.namePh': 'Name it, like “Dusk”',
+    'ink.bright': 'Ink brightness',
+    'ink.followPaper': 'Follow paper',
+    'ink.followBody': 'Same as body',
+    'ink.defaultName': 'Custom {n}',
+    'ink.saved': 'Saved: “{name}” {c}. Double-click it to rename, right-click to delete.',
+    'ink.renamePrompt': 'Name this ink?',
+    'ink.deleteConfirm': 'Delete the ink “{name}”?',
+
+    // ── 版 ───────────────────────────────────────────────────────
+    'preset.label': 'Presets',
+    'preset.namePh': 'Name the current setup',
+    'preset.builtinTitle': 'Built-in preset',
+    'preset.defaultName': 'My preset {n}',
+    'preset.applied': 'Switched to “{name}”. Your content is untouched.',
+    'preset.saved': 'Saved: “{name}”. Double-click to rename, right-click to delete.',
+    'preset.renamePrompt': 'Name this preset?',
+    'preset.deleteConfirm': 'Delete the preset “{name}”?',
+    'layout.bodyDir': 'Body direction',
+    'layout.titleDir': 'Title direction',
+    'layout.bodyAlign': 'Body alignment',
+    'layout.titleAlign': 'Title alignment',
+    'layout.orient': 'Page size',
+    'layout.pages': 'Split into',
+    'layout.pagesAuto': 'Auto',
+    'layout.offset': 'Block offset',
+    'layout.offsetHint': 'drag directly on the preview',
+    'layout.offsetVal': 'X {x} · Y {y}',
+    'layout.offsetNone': 'Not moved',
+    'layout.offsetReset': 'Reset',
+
+    // ── 预览 / 计数 ──────────────────────────────────────────────
+    'count.pages': 'Pages: {n} · {w}×{h} · exports {ew}×{eh}',
+    'count.notesGlue': ' — ',
+    'count.notesJoin': '; ',
+    'count.grewNote': 'too much text for that few pages, the whole stack grew taller',
+    'count.fewerNote': 'asked for {want} pages, but the content only fills {got}',
+    'count.renderFail': 'Could not render: {msg}',
+
+    // ── 存 / 复制 ────────────────────────────────────────────────
+    'save.working': 'Saving {n} images…',
+    'save.fileOne': 'excerpt_{stamp}.jpg',
+    'save.fileMulti': 'excerpt_{stamp}_{i}of{n}.jpg',
+    'save.doneFallback': 'Saved {n} images; {fb} could not go into the subfolder and landed straight in Downloads.',
+    'save.done': 'Saved {n} images to: Downloads/{dir}',
+    'copy.donePage': 'Copied page {n}',
+    'copy.done': 'Copied to clipboard',
+    'copy.denied': 'This site blocks clipboard access — use “Save” instead',
+
+    // ── 登记表显示名（核心数据不动，显示时查这里；用户自造的走兜底）──
+    'orient.portrait': 'Portrait', 'orient.landscape': 'Landscape',
+    'paper.rice': 'Rice paper', 'paper.cream': 'Cream', 'paper.kraft': 'Kraft',
+    'paper.linen': 'Linen', 'paper.black': 'Pure black',
+    'preset.p_zhai': 'Excerpt', 'preset.p_riji': 'Diary', 'preset.p_xin': 'Letter', 'preset.p_shu': 'Vertical',
+    'ink.black': 'Ink black', 'ink.sepia': 'Sepia', 'ink.indigo': 'Indigo', 'ink.crimson': 'Crimson',
+    'ink.pine': 'Pine green', 'ink.ash': 'Ash gray', 'ink.paper': 'Paper white', 'ink.moon': 'Moon white',
+    'ink.gold': 'Pale gold', 'ink.rose': 'Lotus pink', 'ink.jade': 'Frost jade',
+    'font.sys': 'System Songti', 'font.zhuque': 'Zhuque Fangsong', 'font.jinghua': 'KingHwa OldSong',
+    'font.huiwen': 'Huiwen Mincho', 'font.jinshu': 'ChillJinshuSong', 'font.chillhuo': 'ChillHuoSong',
+    'font.duanhei': 'ChillDuanHeiSong', 'font.nanxi': 'Nanxi Youmosong', 'font.nano': 'Nano OldSong',
+    'font.chaohua': 'Zhaohua Min A', 'font.chaohuaB': 'Zhaohua Min B', 'font.dinglie': 'Dinglie Songke',
+    'font.pixel': 'Fusion Pixel',
+    'hint.fellEng': '17th-century type', 'hint.fellPica': '17th-century type',
+    'hint.elite': 'typewriter', 'hint.limelight': 'display', 'hint.uncial': 'uncial',
+    'hint.smokum': 'western slab', 'hint.beau': 'script', 'hint.jim': 'blackletter',
+    'hint.tages': 'handwritten', 'hint.coral': 'pixel',
+  },
+};
+
+function resolveStudioLocale(v) {
+  if (v === 'zh-CN' || v === 'en') return v;
+  let lang = 'zh';
+  try {
+    lang = String((navigator.languages && navigator.languages[0]) || navigator.language || 'zh');
+  } catch {}
+  return lang.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
+}
+let studioLocale = resolveStudioLocale('auto');
+function setStudioLocale(v) { studioLocale = resolveStudioLocale(v); }
+
+// 查词：当前语言 → zh-CN 兜底 → 键名本身（宁可露出键名也不静默空白）
+function t(key, params) {
+  let s = STUDIO_I18N[studioLocale][key];
+  if (s == null) s = STUDIO_I18N['zh-CN'][key];
+  if (s == null) return key;
+  if (params) for (const p in params) s = s.split('{' + p + '}').join(String(params[p]));
+  return s;
+}
+
+// 登记表显示名：有词条用词条，没有（用户自造的）用它存的名字
+function tName(prefix, id, fallback) {
+  const k = prefix + '.' + id;
+  return (STUDIO_I18N[studioLocale][k] != null || STUDIO_I18N['zh-CN'][k] != null) ? t(k) : fallback;
+}
+// ════════════════════════════════════════════════════════════════════
 //  7. 界面（关在 shadow DOM 里，免得被网站的 CSS 冲了）
 // ════════════════════════════════════════════════════════════════════
 const CSS = `
@@ -1251,7 +1586,7 @@ function showPill(x, y, text){
   ui();
   if (!pill){
     pill = document.createElement('button');
-    pill.className = 'pill'; pill.textContent = '摘';
+    pill.className = 'pill'; pill.textContent = t('pill.clip');
     pill.onmousedown = e => e.preventDefault();     // 别让点击清掉选区
     root.append(pill);
   }
@@ -1280,6 +1615,8 @@ const pickFiles = accept => new Promise(res => {
 // onClose 在面板真正关掉后回调一次（嵌入方拿它恢复自己的阅读位置/焦点）。
 // 不传 init 时行为与从前完全相同 —— 网页选中路径一个字都没变。
 function openPanel(text, init = {}){
+  // 语言先落定再建面板：面板 HTML 是开面板时现拼的，t() 在拼的那一刻取词
+  setStudioLocale(init.locale || 'auto');
   ui();
   if (mask) mask.remove();
   const blank = !String(text || '').trim();     // 空手起稿（写日记随笔），不是从网页上摘的
@@ -1315,115 +1652,115 @@ function openPanel(text, init = {}){
   mask.innerHTML = `
     <div class="box">
       <div class="side">
-        <h2>拾 句<span class="sw" id="theme" style="float:right">
-          <button data-v="auto">跟随</button><button data-v="day">白天</button><button data-v="night">黑夜</button>
+        <h2>${t('app.title')}<span class="sw" id="theme" style="float:right">
+          <button data-v="auto">${t('theme.auto')}</button><button data-v="day">${t('theme.day')}</button><button data-v="night">${t('theme.night')}</button>
         </span></h2><p class="h" id="tag"></p>
 
         <div class="tabs" id="tabs">
-          <button data-v="text">文</button><button data-v="paper">纸</button>
-          <button data-v="font">字</button><button data-v="ink">色</button>
-          <button data-v="layout">版</button>
+          <button data-v="text">${t('tab.text')}</button><button data-v="paper">${t('tab.paper')}</button>
+          <button data-v="font">${t('tab.font')}</button><button data-v="ink">${t('tab.ink')}</button>
+          <button data-v="layout">${t('tab.layout')}</button>
         </div>
 
         <div class="pane" data-p="text">
-          <label>标题<span class="sw"><span style="font-size:10px">字号 · 字重</span></span></label>
-          <input type="text" id="ti" placeholder="留空就没有标题">
+          <label>${t('text.title')}<span class="sw"><span style="font-size:10px">${t('text.sizeWeight')}</span></span></label>
+          <input type="text" id="ti" placeholder="${t('text.titlePh')}">
           <div class="fs" style="margin-top:6px">
             <input type="range" id="ts" min="20" max="140" step="1">
             <input type="number" id="tsn" min="12" max="300" step="1">
             <span class="sw" id="tw">
-              <button data-v="0">常</button><button data-v="1">中</button><button data-v="2">粗</button></span>
+              <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
           </div>
-          <label>内容<span class="sw"><span style="font-size:10px">字号 · 字重</span></span></label>
+          <label>${t('text.body')}<span class="sw"><span style="font-size:10px">${t('text.sizeWeight')}</span></span></label>
           <textarea id="t"></textarea>
           <div class="fs" style="margin-top:6px">
             <input type="range" id="fs" min="20" max="96" step="1">
             <input type="number" id="fsn" min="12" max="200" step="1">
             <span class="sw" id="weight">
-              <button data-v="0">常</button><button data-v="1">中</button><button data-v="2">粗</button></span>
+              <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
           </div>
-          <label>出处<span class="sw" id="swSrc">
-            <button data-v="1">显示</button><button data-v="0">隐藏</button></span></label>
+          <label>${t('text.source')}<span class="sw" id="swSrc">
+            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
           <div class="fs">
-            <input type="text" id="sp" placeholder="前缀" style="width:64px;padding:5px 6px;font-size:12px">
+            <input type="text" id="sp" placeholder="${t('text.sourcePrefixPh')}" style="width:64px;padding:5px 6px;font-size:12px">
             <input type="text" id="s" style="flex:1">
           </div>
-          <label>日期<span class="sw" id="swDate">
-            <button data-v="1">显示</button><button data-v="0">隐藏</button></span></label>
+          <label>${t('text.date')}<span class="sw" id="swDate">
+            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
           <input type="text" id="d">
-          <label>题头<span class="sw" id="swHead">
-            <button data-v="1">显示</button><button data-v="0">隐藏</button></span></label>
-          <input type="text" id="hd" placeholder="摘 录 / 日记 / 随笔 …">
-          <label>三道线要不要</label>
+          <label>${t('text.header')}<span class="sw" id="swHead">
+            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
+          <input type="text" id="hd" placeholder="${t('text.headerPh')}">
+          <label>${t('text.rules')}</label>
           <div class="row">
-            <button id="rHead" style="flex:1">题头下</button>
-            <button id="rTitle" style="flex:1">标题下</button>
-            <button id="rFoot" style="flex:1">页脚</button>
+            <button id="rHead" style="flex:1">${t('text.ruleHead')}</button>
+            <button id="rTitle" style="flex:1">${t('text.ruleTitle')}</button>
+            <button id="rFoot" style="flex:1">${t('text.ruleFoot')}</button>
           </div>
         </div>
 
         <div class="pane" data-p="paper">
-          <div class="sub">内置（代码画的）</div><div class="grid" id="paperBuiltin"></div>
-          <div class="sub" id="packHd">素材包</div><div class="grid" id="paperPack"></div>
-          <div class="sub">我加的</div><div class="grid" id="paperMine"></div>
-          <label>纸张明暗</label>
+          <div class="sub">${t('paper.builtin')}</div><div class="grid" id="paperBuiltin"></div>
+          <div class="sub" id="packHd">${t('paper.pack')}</div><div class="grid" id="paperPack"></div>
+          <div class="sub">${t('paper.mine')}</div><div class="grid" id="paperMine"></div>
+          <label>${t('paper.bright')}</label>
           <div class="fs"><input type="range" id="pl" min="-50" max="50" step="1">
             <span class="val" id="plv"></span></div>
         </div>
 
         <div class="pane" data-p="font">
-          <div class="sub">正文字体</div><div class="flist" id="font"></div>
-          <div class="sub">西文字体（只管字母和数字）</div><div class="flist" id="latin"></div>
-          <div class="sub">标题字体</div><div class="flist" id="swTitleFont"></div>
+          <div class="sub">${t('font.body')}</div><div class="flist" id="font"></div>
+          <div class="sub">${t('font.latin')}</div><div class="flist" id="latin"></div>
+          <div class="sub">${t('font.title')}</div><div class="flist" id="swTitleFont"></div>
         </div>
 
         <div class="pane" data-p="ink">
-          <label>正文墨色</label><div class="row inks" id="ink"></div>
-          <label>题头/出处/日期的颜色</label><div class="row inks" id="metaInk"></div>
-          <label>引号里那段话的颜色</label><div class="row inks" id="quoteInk"></div>
-          <label>自己调<span class="sw"><span style="font-size:10px">双击改名 · 右键删</span></span></label>
+          <label>${t('ink.body')}</label><div class="row inks" id="ink"></div>
+          <label>${t('ink.meta')}</label><div class="row inks" id="metaInk"></div>
+          <label>${t('ink.quote')}</label><div class="row inks" id="quoteInk"></div>
+          <label>${t('ink.custom')}<span class="sw"><span style="font-size:10px">${t('ink.customHint')}</span></span></label>
           <div class="fs">
             <input type="color" id="ck">
-            <input type="text" id="ckn" placeholder="起个名，比如「黄昏」" maxlength="24"
+            <input type="text" id="ckn" placeholder="${t('ink.namePh')}" maxlength="24"
                    style="flex:1;padding:5px 7px;font-size:12px">
             <button id="ckSave" style="padding:6px 9px;border:1px solid var(--line);
-                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">存</button>
+                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('act.store')}</button>
           </div>
-          <label>墨色明暗</label>
+          <label>${t('ink.bright')}</label>
           <div class="fs"><input type="range" id="il" min="-50" max="50" step="1">
             <span class="val" id="ilv"></span></div>
         </div>
 
         <div class="pane" data-p="layout">
-          <label>版式预设</label><div class="row" id="presets"></div>
+          <label>${t('preset.label')}</label><div class="row" id="presets"></div>
           <div class="fs" style="margin-top:6px">
-            <input type="text" id="psn" placeholder="给当前这套版式起个名" maxlength="24"
+            <input type="text" id="psn" placeholder="${t('preset.namePh')}" maxlength="24"
                    style="flex:1;padding:5px 7px;font-size:12px">
             <button id="psSave" style="padding:6px 9px;border:1px solid var(--line);
-                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">存</button>
+                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('act.store')}</button>
           </div>
 
-          <label>正文排向<span class="sw" id="vert">
-            <button data-v="0">横排</button><button data-v="1">竖排</button></span></label>
-          <label>标题排向<span class="sw" id="tvert">
-            <button data-v="0">横排</button><button data-v="1">竖排</button></span></label>
-          <label>正文对齐</label><div class="row" id="align"></div>
-          <label>标题对齐</label><div class="row" id="talign"></div>
-          <label>版式</label><div class="row" id="orient"></div>
-          <label>拆成几张</label><div class="row" id="pagesRow"></div>
-          <label>整块位移<span class="sw"><span style="font-size:10px">在右边预览图上直接拖</span></span></label>
+          <label>${t('layout.bodyDir')}<span class="sw" id="vert">
+            <button data-v="0">${t('dir.horizontal')}</button><button data-v="1">${t('dir.vertical')}</button></span></label>
+          <label>${t('layout.titleDir')}<span class="sw" id="tvert">
+            <button data-v="0">${t('dir.horizontal')}</button><button data-v="1">${t('dir.vertical')}</button></span></label>
+          <label>${t('layout.bodyAlign')}</label><div class="row" id="align"></div>
+          <label>${t('layout.titleAlign')}</label><div class="row" id="talign"></div>
+          <label>${t('layout.orient')}</label><div class="row" id="orient"></div>
+          <label>${t('layout.pages')}</label><div class="row" id="pagesRow"></div>
+          <label>${t('layout.offset')}<span class="sw"><span style="font-size:10px">${t('layout.offsetHint')}</span></span></label>
           <div class="fs">
             <span class="val" id="offv" style="width:auto"></span>
             <button id="offReset" style="padding:5px 9px;border:1px solid var(--line);
-                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">归位</button>
+                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('layout.offsetReset')}</button>
           </div>
         </div>
 
         <div class="acts">
-          <button class="save" id="save">存 图</button>
-          <button class="copy" id="copy">复制这张</button>
+          <button class="save" id="save">${t('act.save')}</button>
+          <button class="copy" id="copy">${t('act.copy')}</button>
         </div>
-        <div class="acts"><button class="close" id="close">关闭</button></div>
+        <div class="acts"><button class="close" id="close">${t('act.close')}</button></div>
         <div class="tip" id="tip"></div>
       </div>
       <div class="view">
@@ -1479,7 +1816,7 @@ function openPanel(text, init = {}){
           const move = ev => {
             st.offsetX = Math.round(bx + (ev.clientX - sx) * scale);
             st.offsetY = Math.round(by + (ev.clientY - sy) * scale);
-            q('#offv').textContent = `左右 ${st.offsetX} · 上下 ${st.offsetY}`;
+            q('#offv').textContent = t('layout.offsetVal', { x: st.offsetX, y: st.offsetY });
             redrawOnly();
           };
           const up = () => {
@@ -1508,12 +1845,12 @@ function openPanel(text, init = {}){
       const grew = plan.H > S0.h || plan.W > S0.w;
       const want = st.pages === 'auto' ? 0 : parseInt(st.pages, 10);
       const notes = [];
-      if (grew) notes.push('这么多字放不进这么少张，整叠一起加高了');
-      if (want && plan.pages.length < want) notes.push(`要 ${want} 张，但内容只够 ${plan.pages.length} 张`);
+      if (grew) notes.push(t('count.grewNote'));
+      if (want && plan.pages.length < want) notes.push(t('count.fewerNote', { want, got: plan.pages.length }));
       q('#count').textContent =
-        `${plan.pages.length} 张　${plan.W}×${plan.H}　导出 ${plan.W*DPR}×${plan.H*DPR}`
-        + (notes.length ? '　—— ' + notes.join('；') : '');
-    } catch (e){ tipEl.textContent = '画不出来：' + e.message; }
+        t('count.pages', { n: plan.pages.length, w: plan.W, h: plan.H, ew: plan.W*DPR, eh: plan.H*DPR })
+        + (notes.length ? t('count.notesGlue') + notes.join(t('count.notesJoin')) : '');
+    } catch (e){ tipEl.textContent = t('count.renderFail', { msg: e.message }); }
   };
   const markSel = () => mask.querySelectorAll('.pg').forEach(el =>
     el.setAttribute('aria-selected', +el.dataset.i === selected));
@@ -1533,8 +1870,8 @@ function openPanel(text, init = {}){
       setCfg(key, st[key]); sync(); draw();
     });
   };
-  mkRow('#orient', Object.entries(SIZES).map(([v, s]) => ({ v, n: s.name })), 'orient');
-  mkRow('#pagesRow', [{v:'auto',n:'自动'},{v:'1',n:'1'},{v:'2',n:'2'},{v:'3',n:'3'},
+  mkRow('#orient', Object.entries(SIZES).map(([v, s]) => ({ v, n: tName('orient', v, s.name) })), 'orient');
+  mkRow('#pagesRow', [{v:'auto',n:t('layout.pagesAuto')},{v:'1',n:'1'},{v:'2',n:'2'},{v:'3',n:'3'},
                       {v:'4',n:'4'},{v:'5',n:'5'},{v:'6',n:'6'}], 'pages');
   function buildInks(){
     // 题头/出处那一行、引号那一行：都是「几个特殊挡 + 全部墨色」，所以走同一个工厂。
@@ -1548,7 +1885,7 @@ function openPanel(text, init = {}){
       }
       for (const i of allInks()){
         const b = document.createElement('button');
-        b.dataset.v = i.id; b.textContent = i.name;
+        b.dataset.v = i.id; b.textContent = tName('ink', i.id, i.name);
         const dot = document.createElement('i'); dot.style.background = i.c; b.prepend(dot);
         box.append(b);
       }
@@ -1557,21 +1894,21 @@ function openPanel(text, init = {}){
         st[key] = b.dataset.v; setCfg(key, st[key]); sync(); draw();
       });
     };
-    mkInkRow('#metaInk',  'metaInk',  [['auto', '跟着纸']]);
+    mkInkRow('#metaInk',  'metaInk',  [['auto', t('ink.followPaper')]]);
     // 引号多一挡「跟正文」＝不要那抹橙
-    mkInkRow('#quoteInk', 'quoteInk', [['auto', '跟着纸'], ['same', '跟正文']]);
+    mkInkRow('#quoteInk', 'quoteInk', [['auto', t('ink.followPaper')], ['same', t('ink.followBody')]]);
 
     const box = q('#ink'); box.textContent = '';
     for (const i of allInks()){
       const b = document.createElement('button');
-      b.dataset.v = i.id; b.textContent = i.name;
+      b.dataset.v = i.id; b.textContent = tName('ink', i.id, i.name);
       const dot = document.createElement('i'); dot.style.background = i.c; b.prepend(dot);
       const mine = (cfg('myInks') || []).some(x => x.id === i.id);
       if (mine){
-        b.title = '双击改名 · 右键删掉';
+        b.title = t('tip.renameDelete');
         b.ondblclick = e => {
           e.preventDefault(); e.stopPropagation();
-          const v = prompt('这支墨叫什么？', i.name);
+          const v = prompt(t('ink.renamePrompt'), i.name);
           if (v === null) return;
           const name = v.trim().slice(0, 24) || i.name;
           setCfg('myInks', cfg('myInks').map(x => x.id === i.id ? { ...x, name } : x));
@@ -1579,7 +1916,7 @@ function openPanel(text, init = {}){
         };
         b.oncontextmenu = e => {
           e.preventDefault();
-          if (!confirm(`删掉「${i.name}」这支墨？`)) return;
+          if (!confirm(t('ink.deleteConfirm', { name: i.name }))) return;
           setCfg('myInks', cfg('myInks').filter(x => x.id !== i.id));
           if (st.ink === i.id){ st.ink = 'black'; setCfg('ink', st.ink); }
           buildInks(); sync(); draw();
@@ -1592,8 +1929,8 @@ function openPanel(text, init = {}){
       st.ink = b.dataset.v; setCfg('ink', st.ink); sync(); draw();
     });
   }
-  mkRow('#align',  [{v:'left',n:'左'},{v:'center',n:'中'},{v:'right',n:'右'}], 'align');
-  mkRow('#talign', [{v:'left',n:'左'},{v:'center',n:'中'},{v:'right',n:'右'}], 'titleAlign');
+  mkRow('#align',  [{v:'left',n:t('align.left')},{v:'center',n:t('align.center')},{v:'right',n:t('align.right')}], 'align');
+  mkRow('#talign', [{v:'left',n:t('align.left')},{v:'center',n:t('align.center')},{v:'right',n:t('align.right')}], 'titleAlign');
   q('#vert').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     st.vertical = b.dataset.v === '1'; setCfg('vertical', st.vertical); sync(); draw();
@@ -1615,19 +1952,19 @@ function openPanel(text, init = {}){
     q('#ts').value = Math.max(20, Math.min(140, st.titleSize)); q('#tsn').value = st.titleSize;
     q('#ck').value = /^#[0-9a-f]{6}$/i.test(st.ink) ? st.ink : inkOf(st.ink);
     buildPapers(); buildFonts(); buildInks(); buildPresets(); sync(); draw();
-    tipEl.textContent = `换成「${p.name}」了。内容没动。`;
+    tipEl.textContent = t('preset.applied', { name: tName('preset', p.id, p.name) });
   }
   function buildPresets(){
     const box = q('#presets'); box.textContent = '';
     for (const p of allPresets()){
       const b = document.createElement('button');
-      b.dataset.v = p.id; b.textContent = p.name;
+      b.dataset.v = p.id; b.textContent = tName('preset', p.id, p.name);
       const mine = (cfg('presets') || []).some(x => x.id === p.id);
-      b.title = mine ? '双击改名 · 右键删掉' : '内置排版';
+      b.title = mine ? t('tip.renameDelete') : t('preset.builtinTitle');
       if (mine){
         b.ondblclick = e => {
           e.preventDefault(); e.stopPropagation();
-          const v = prompt('这套版式叫什么？', p.name);
+          const v = prompt(t('preset.renamePrompt'), p.name);
           if (v === null) return;
           const name = v.trim().slice(0, 24) || p.name;
           setCfg('presets', cfg('presets').map(x => x.id === p.id ? { ...x, name } : x));
@@ -1635,7 +1972,7 @@ function openPanel(text, init = {}){
         };
         b.oncontextmenu = e => {
           e.preventDefault();
-          if (!confirm(`删掉「${p.name}」这套版式？`)) return;
+          if (!confirm(t('preset.deleteConfirm', { name: p.name }))) return;
           setCfg('presets', cfg('presets').filter(x => x.id !== p.id));
           buildPresets();
         };
@@ -1645,12 +1982,12 @@ function openPanel(text, init = {}){
     }
   }
   q('#psSave').onclick = () => {
-    const name = (q('#psn').value || '').trim().slice(0, 24) || '我的版式' + ((cfg('presets') || []).length + 1);
+    const name = (q('#psn').value || '').trim().slice(0, 24) || t('preset.defaultName', { n: (cfg('presets') || []).length + 1 });
     const style = {}; for (const k of STYLE_KEYS) style[k] = st[k];
     setCfg('presets', (cfg('presets') || []).concat([{ id: 'ps' + Date.now(), name, style }]));
     q('#psn').value = '';
     buildPresets();
-    tipEl.textContent = `存好了：「${name}」。双击改名，右键删掉。`;
+    tipEl.textContent = t('preset.saved', { name });
   };
 
   // 标签页
@@ -1693,7 +2030,7 @@ function openPanel(text, init = {}){
     if (contrast(cur, mean) >= MIN_CONTRAST) return null;
     const pick = bestInk(mean);
     st.ink = pick.id; setCfg('ink', pick.id);
-    return pick.name;
+    return tName('ink', pick.id, pick.name);
   }
 
   // 一枚纸的缩略图按钮。看图选纸比看名字快得多，这是这轮改版的核心。
@@ -1706,7 +2043,7 @@ function openPanel(text, init = {}){
       st.paper = value; setCfg('paper', st.paper);
       const swapped = autoInk();
       sync(); draw();
-      if (swapped) tipEl.textContent = `这张纸太浓，黑字看不清，墨色替你换成了「${swapped}」——不喜欢就自己再挑。`;
+      if (swapped) tipEl.textContent = t('paper.autoInkSwapped', { name: swapped });
     };
     return b;
   }
@@ -1718,24 +2055,25 @@ function openPanel(text, init = {}){
     for (const [k, v] of Object.entries(PAPERS)){
       const c = document.createElement('canvas'); c.width = 72; c.height = 90;
       c.getContext('2d').drawImage(makePaper(k, 72, 90), 0, 0);
-      bi.append(paperTile(k, v.name, c));
+      bi.append(paperTile(k, tName('paper', k, v.name), c));
     }
 
     const ps = packs();
-    q('#packHd').textContent = ps.length ? '素材包' : '素材包（还没导，按下面的「＋包」）';
+    q('#packHd').textContent = ps.length ? t('paper.pack') : t('paper.packEmpty');
     for (const s of ps){
       const im = document.createElement('img');
       im.src = s.portrait || s.landscape; im.loading = 'lazy';
       pk.append(paperTile('pk:' + s.key, s.cn || s.en, im,
-                          `${s.cn || s.en}（${s.group === 'bold' ? '浓色' : '柔色'}）`));
+                          t('paper.packTileTitle', { name: s.cn || s.en,
+                            group: s.group === 'bold' ? t('paper.groupBold') : t('paper.groupSoft') })));
     }
 
     for (const p of cfg('myPapers')){
       const im = document.createElement('img'); im.src = p.data;
-      const b = paperTile('my:' + p.id, p.name, im, '双击改名 · 右键删掉');
+      const b = paperTile('my:' + p.id, p.name, im, t('tip.renameDelete'));
       b.ondblclick = e => {
         e.preventDefault(); e.stopPropagation();
-        const v = prompt('这张纸叫什么？', p.name);
+        const v = prompt(t('paper.renamePrompt'), p.name);
         if (v === null) return;
         const name = v.trim().slice(0, 24) || p.name;
         setCfg('myPapers', cfg('myPapers').map(x => x.id === p.id ? { ...x, name } : x));
@@ -1743,7 +2081,7 @@ function openPanel(text, init = {}){
       };
       b.oncontextmenu = e => {
         e.preventDefault();
-        if (!confirm(`删掉「${p.name}」这张纸？`)) return;
+        if (!confirm(t('paper.deleteConfirm', { name: p.name }))) return;
         setCfg('myPapers', cfg('myPapers').filter(x => x.id !== p.id));
         myPaperImgs.delete(p.id); meanCache.delete('my:' + p.id);
         if (st.paper === 'my:' + p.id){ st.paper = 'rice'; setCfg('paper', st.paper); }
@@ -1754,38 +2092,38 @@ function openPanel(text, init = {}){
 
     const box = mine;
     const add = document.createElement('button');
-    add.className = 'sw3 plus'; add.textContent = '＋'; add.title = '把你自己的信纸图丢进来';
+    add.className = 'sw3 plus'; add.textContent = t('paper.addTile'); add.title = t('paper.addTileTitle');
     add.onclick = async () => {
       const files = await pickFiles('image/*'); if (!files.length) return;
-      tipEl.textContent = '正在收纸…';
+      tipEl.textContent = t('paper.importing');
       const list = cfg('myPapers').slice(); let ok = 0;
       for (const f of files){
         try {
           const data = await shrink(await readFile(f, 'url'));
           // 文件名要是「1.jpg」这种没信息量的，别拿来当名字，给个「我的纸N」
           const raw = f.name.replace(/\.[^.]+$/, '').trim();
-          const name = (raw && !/^[\d\s_-]+$/.test(raw)) ? raw.slice(0, 24) : `我的纸${list.length + 1}`;
+          const name = (raw && !/^[\d\s_-]+$/.test(raw)) ? raw.slice(0, 24) : t('paper.defaultName', { n: list.length + 1 });
           list.push({ id:'p'+Date.now()+Math.floor(Math.random()*1e4), name, data });
           ok++;
-        } catch { tipEl.textContent = '这张收不进来：' + f.name; }
+        } catch { tipEl.textContent = t('paper.oneFail', { name: f.name }); }
       }
       setCfg('myPapers', list);
       const mb = (storedBytes()/1e6).toFixed(1);
       // 收尾话由真发生的事推出来，不写死「收了 N 张」
       tipEl.textContent = ok === files.length
-        ? `收了 ${ok} 张（已占 ${mb}MB）。双击一张纸可以改名，右键删掉。`
-        : `${files.length} 张里收进来 ${ok} 张（已占 ${mb}MB）。双击改名，右键删掉。`;
-      if (storedBytes() > 9e6) tipEl.textContent += ' 存的东西有点多了，建议删掉些不用的。';
+        ? t('paper.importedAll', { n: ok, mb })
+        : t('paper.importedSome', { total: files.length, n: ok, mb });
+      if (storedBytes() > 9e6) tipEl.textContent += t('paper.storageFull');
       buildPapers(); sync(); draw();
     };
     box.append(add);
 
     const pkBtn = document.createElement('button');
-    pkBtn.className = 'sw3 plus'; pkBtn.textContent = '＋包';
-    pkBtn.title = '导入信纸素材包（.json），导一次就常驻，所有网站通用';
+    pkBtn.className = 'sw3 plus'; pkBtn.textContent = t('paper.addPack');
+    pkBtn.title = t('paper.addPackTitle');
     pkBtn.onclick = async () => {
       const files = await pickFiles('.json,application/json'); if (!files.length) return;
-      tipEl.textContent = '正在读素材包…';
+      tipEl.textContent = t('paper.packReading');
       try {
         const text = await new Promise((res, rej) => {
           const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(files[0]);
@@ -1793,10 +2131,10 @@ function openPanel(text, init = {}){
         const n = await installPack(text);
         // 收尾这句必须照事实说 —— 存不下的时候「以后不用再导」就是句谎话
         tipEl.textContent = installPack.persisted
-          ? `装好了：${n} 套（横竖各一张）。以后不用再导。`
-          : `这次能用：${n} 套。但存不下来（浏览器给脚本的空间不够装这么大的包），换一页要重导。`;
+          ? t('paper.packInstalled', { n })
+          : t('paper.packVolatile', { n });
         buildPapers(); sync(); draw();
-      } catch (e){ tipEl.textContent = '这个素材包读不了：' + e.message; }
+      } catch (e){ tipEl.textContent = t('paper.packBad', { msg: e.message }); }
     };
     box.append(pkBtn);
   }
@@ -1819,13 +2157,13 @@ function openPanel(text, init = {}){
     const box = q('#font'); box.textContent = '';
     for (const f of FONTS){
       const ok = fontAvailable(f);
-      const b = fontRow(f.id, f.name, ok ? cjkStack(f.id) : null, ok ? '' : '没装', !ok);
-      if (!ok) b.title = '系统里没装这款字';
+      const b = fontRow(f.id, tName('font', f.id, f.name), ok ? cjkStack(f.id) : null, ok ? '' : t('font.hintMissing'), !ok);
+      if (!ok) b.title = t('font.missingTitle');
       box.append(b);
     }
     for (const f of cfg('myFonts')){
-      const b = fontRow(f.id, f.name, `"${f.id}"`, '自装');
-      b.title = '右键删掉';
+      const b = fontRow(f.id, f.name, `"${f.id}"`, t('font.hintCustom'));
+      b.title = t('tip.rightDelete');
       b.oncontextmenu = e => {
         e.preventDefault();
         setCfg('myFonts', cfg('myFonts').filter(x => x.id !== f.id));
@@ -1840,39 +2178,39 @@ function openPanel(text, init = {}){
     for (const l of LATIN){
       const hit = l.probes.length ? resolveFont(l) : null;
       if (l.probes.length && !hit) continue;
-      lb.append(fontRow(l.id, l.id === 'none' ? '不指定（跟着中文字体走）' : `${l.name} — Aa Bb 0123`,
-                        hit ? `"${hit}"` : null, l.hint || ''));
+      lb.append(fontRow(l.id, l.id === 'none' ? t('font.noneLatin') : `${l.name} — Aa Bb 0123`,
+                        hit ? `"${hit}"` : null, l.hint ? tName('hint', l.id, l.hint) : ''));
     }
 
     // 标题字体：中文和英文都能挑（挑了英文字，汉字会自动落回正文的中文字体）
     const tb = q('#swTitleFont'); tb.textContent = '';
-    tb.append(fontRow('same', '同正文', null, ''));
+    tb.append(fontRow('same', t('font.sameAsBody'), null, ''));
     for (const f of FONTS){
       if (!f.probes.length || !fontAvailable(f)) continue;
-      tb.append(fontRow(f.id, f.name, cjkStack(f.id), '中文'));
+      tb.append(fontRow(f.id, tName('font', f.id, f.name), cjkStack(f.id), t('font.hintCjk')));
     }
-    for (const f of cfg('myFonts')) tb.append(fontRow(f.id, f.name, `"${f.id}"`, '自装'));
+    for (const f of cfg('myFonts')) tb.append(fontRow(f.id, f.name, `"${f.id}"`, t('font.hintCustom')));
     for (const l of LATIN){
       if (!l.probes.length) continue;
       const hit = resolveFont(l); if (!hit) continue;
-      tb.append(fontRow(l.id, `${l.name} — Aa`, `"${hit}"`, l.hint || '西文'));
+      tb.append(fontRow(l.id, `${l.name} — Aa`, `"${hit}"`, l.hint ? tName('hint', l.id, l.hint) : t('font.hintLatin')));
     }
 
     const add = document.createElement('button');
-    add.textContent = '＋ 从文件装一款字'; add.style.fontSize = '12px';
-    add.title = '存在油猴里，所有网站通用';
+    add.textContent = t('font.add'); add.style.fontSize = '12px';
+    add.title = t('font.addTitle');
     add.onclick = async () => {
       const files = await pickFiles('.ttf,.otf,.woff,.woff2,font/*'); if (!files.length) return;
       const list = cfg('myFonts').slice();
       for (const f of files){
         if (f.size > 12*1024*1024){
-          tipEl.textContent = `${f.name} 有 ${(f.size/1e6).toFixed(0)}MB，太大存不进油猴。请用裁过子集的版本，或直接双击装进系统。`;
+          tipEl.textContent = t('font.tooBig', { name: f.name, mb: (f.size/1e6).toFixed(0) });
           continue;
         }
         try { list.push({ id:'f'+Date.now()+Math.floor(Math.random()*1e4),
                           name: f.name.replace(/\.[^.]+$/, '').slice(0, 24),
                           data: await readFile(f, 'url') }); }
-        catch { tipEl.textContent = '装不上：' + f.name; }
+        catch { tipEl.textContent = t('font.installFail', { name: f.name }); }
       }
       setCfg('myFonts', list); await ensureCustomFonts(); buildFonts(); sync(); draw();
     };
@@ -1881,7 +2219,7 @@ function openPanel(text, init = {}){
     const pickFont = (el, key) => el.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b || !b.dataset.v) return;
       if (b.dataset.off === '1'){
-        tipEl.textContent = `这款字系统里没装。双击字体文件装进 Windows（装完要**完全重开浏览器**），或按下面的「＋ 从文件装」。`;
+        tipEl.textContent = t('font.notInstalledTip');
         return;
       }
       st[key] = b.dataset.v; setCfg(key, st[key]); sync(); draw();
@@ -1911,7 +2249,7 @@ function openPanel(text, init = {}){
     q('#il').value = st.inkLight;   q('#ilv').textContent = fmt(st.inkLight);
     q('#pl').value = st.paperLight; q('#plv').textContent = fmt(st.paperLight);
     q('#offv').textContent = (st.offsetX || st.offsetY)
-      ? `左右 ${Math.round(st.offsetX)} · 上下 ${Math.round(st.offsetY)}` : '没挪过';
+      ? t('layout.offsetVal', { x: Math.round(st.offsetX), y: Math.round(st.offsetY) }) : t('layout.offsetNone');
   };
 
   // 字号：滑块和数字框互相跟随，数字框可以超出滑块范围。
@@ -1932,13 +2270,13 @@ function openPanel(text, init = {}){
   q('#ck').oninput = e => { st.ink = e.target.value; setCfg('ink', st.ink); sync(); draw(); };
   q('#ckSave').onclick = () => {
     const c = q('#ck').value;
-    const name = (q('#ckn').value || '').trim().slice(0, 24) || '自配' + ((cfg('myInks') || []).length + 1);
+    const name = (q('#ckn').value || '').trim().slice(0, 24) || t('ink.defaultName', { n: (cfg('myInks') || []).length + 1 });
     const id = 'ink' + Date.now() + Math.floor(Math.random() * 1e4);
     setCfg('myInks', (cfg('myInks') || []).concat([{ id, name, c }]));
     st.ink = id; setCfg('ink', id);
     q('#ckn').value = '';
     buildInks(); sync(); draw();
-    tipEl.textContent = `存好了：「${name}」${c}。双击它可以改名，右键删掉。`;
+    tipEl.textContent = t('ink.saved', { name, c });
   };
   q('#il').oninput = e => { st.inkLight   = +e.target.value; setCfg('inkLight',   st.inkLight);   sync(); draw(); };
   q('#pl').oninput = e => { st.paperLight = +e.target.value; setCfg('paperLight', st.paperLight); sync(); draw(); };
@@ -1964,12 +2302,12 @@ function openPanel(text, init = {}){
     const stamp = stampName();
     const sub = (cfg('subdir') || '').replace(/[\\/]+$/, '');
     let ok = 0, viaFallback = 0;
-    tipEl.textContent = `正在存 ${n} 张…`;
+    tipEl.textContent = t('save.working', { n });
     for (let i = 0; i < n; i++){
       const blob = await new Promise(r => pageCanvases[i].toBlob(r, 'image/jpeg', 0.94));
       if (!blob) continue;
       const url = URL.createObjectURL(blob);
-      const base = n > 1 ? `摘录_${stamp}_${i+1}of${n}.jpg` : `摘录_${stamp}.jpg`;
+      const base = n > 1 ? t('save.fileMulti', { stamp, i: i+1, n }) : t('save.fileOne', { stamp });
       const name = (sub ? sub + '/' : '') + base;
       const done = await new Promise(res => {
         try {
@@ -1990,8 +2328,8 @@ function openPanel(text, init = {}){
     }
     // 说出真发生的事，不说固定句
     tipEl.textContent = viaFallback
-      ? `存了 ${ok + viaFallback} 张，其中 ${viaFallback} 张进不了子目录，直接落在下载目录。`
-      : `已存 ${ok} 张到：下载目录/${sub ? sub + '/' : ''}`;
+      ? t('save.doneFallback', { n: ok + viaFallback, fb: viaFallback })
+      : t('save.done', { n: ok, dir: sub ? sub + '/' : '' });
   };
 
   q('#copy').onclick = () => {
@@ -1999,8 +2337,8 @@ function openPanel(text, init = {}){
     cv.toBlob(async b => {
       try {
         await navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]);
-        tipEl.textContent = pageCanvases.length > 1 ? `已复制第 ${selected+1} 张` : '已复制到剪贴板';
-      } catch { tipEl.textContent = '这个网站不给复制权限，请用「存图」'; }
+        tipEl.textContent = pageCanvases.length > 1 ? t('copy.donePage', { n: selected+1 }) : t('copy.done');
+      } catch { tipEl.textContent = t('copy.denied'); }
     }, 'image/png');
   };
 

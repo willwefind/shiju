@@ -31,6 +31,7 @@ export const ORDER = [
   'core/paginate.js',        // 正文压流/分页装箱
   'core/layout.js',          // titleBlock/chrome/planPages —— 排版计划
   'core/render.js',          // renderPage —— 把一页画到 canvas
+  'studio/studio-i18n.js',   // Studio 界面语言（zh-CN/en 词典 + t()）
   'studio/studio-shell.js',  // Shadow DOM 面板全部界面
   'adapters/selection.js',   // 选区监听/Alt+Q/三指轻点
   'adapters/sillytavern.js', // 酒馆扩展入口
