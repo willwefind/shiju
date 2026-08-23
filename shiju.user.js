@@ -1644,11 +1644,16 @@ function openPanel(text, init = {}){
   };
   const prefersDark = () => { try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch { return false; } };
   const applyTheme = () => {
+    if (!alive()) return;      // 系统主题翻转可能发生在面板关掉之后
     const night = st.theme === 'night' || (st.theme === 'auto' && prefersDark());
     mask.classList.toggle('night', night);
   };
 
   mask = document.createElement('div'); mask.className = 'mask';
+  // 本代面板的身份证：关掉或被新面板顶替后，这一代遗留的异步回调
+  // （字体装载、纸解码、聚焦定时器、主题监听）一律安静退场，不再摸已空的 mask。
+  const thisMask = mask;
+  const alive = () => mask === thisMask;
   mask.innerHTML = `
     <div class="box">
       <div class="side">
@@ -1785,10 +1790,11 @@ function openPanel(text, init = {}){
   // 🔴 早先 draw() 每次都把预览区整个清空重建，正在拖的那个 canvas 当场被销毁，
   //    指针捕获立刻断掉，于是「只能拖动一下下」。不是范围小，是只生效了一帧。
   const redrawOnly = () => {
-    if (!plan) return;
+    if (!alive() || !plan) return;
     pageCanvases.forEach((cv, i) => { if (plan.pages[i]) renderPage(cv, st, plan, i); });
   };
   const draw = () => {
+    if (!alive()) return;
     st.text = q('#t').value; st.source = q('#s').value; st.date = q('#d').value;
     st.headText = q('#hd').value; st.title = q('#ti').value;
     st.sourcePrefix = q('#sp').value;
@@ -2285,16 +2291,17 @@ function openPanel(text, init = {}){
   q('#ti').oninput = draw;
 
   const close = () => {
-    if (!mask) return;
+    // 自己的 Esc 监听无条件先摘：被新面板顶替后残留的那份也借这条路自清
+    document.removeEventListener('keydown', esc);
+    if (!alive()) return;
     mask.remove(); mask = null;
     // onClose 只在真关掉的那一次响 —— close 本身保持幂等
     if (typeof init.onClose === 'function') try { init.onClose(); } catch {}
   };
   q('#close').onclick = close;
   mask.onclick = e => { if (e.target === mask) close(); };
-  document.addEventListener('keydown', function esc(e){
-    if (e.key === 'Escape' && mask){ close(); document.removeEventListener('keydown', esc); }
-  });
+  const esc = e => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', esc);
 
   // ── 存 / 复制 ───────────────────────────────────────────────────
   q('#save').onclick = async () => {
@@ -2346,8 +2353,8 @@ function openPanel(text, init = {}){
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch {}
   q('#tabs').querySelector('button').click();      // 默认落在「文」这一屏
   buildPapers(); buildFonts(); buildInks(); buildPresets(); sync(); draw();
-  if (blank) setTimeout(() => { q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
-  ensureCustomFonts().then(() => { buildFonts(); sync(); draw(); });
+  if (blank) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
+  ensureCustomFonts().then(() => { if (!alive()) return; buildFonts(); sync(); draw(); });
   Promise.all(cfg('myPapers').map(p => new Promise(r => {
     const i = myPaper(p.id); i && !i.complete ? (i.onload = r, i.onerror = r) : r();
   }))).then(draw);
