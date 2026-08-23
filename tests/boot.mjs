@@ -65,12 +65,15 @@ export function bootShiju(opt = {}) {
 
   globalThis.__shijuPlatform = opt.platform || makePlatform();
   delete globalThis.__shiju;
+  delete globalThis.__shijuEmbed;
 
   const script = opt.script || path.join(ROOT, 'shiju.user.js');
   new Function(fs.readFileSync(script, 'utf8'))();
 
-  const S = globalThis.__shiju;
-  if (!S) throw new Error('shiju.user.js 没把 __shiju 挂出来 —— 看看是不是被守卫挡了');
+  // 用户脚本挂 __shiju；嵌入包挂 __shijuEmbed（opt.expect 指定）
+  const expect = opt.expect || '__shiju';
+  const S = globalThis[expect];
+  if (!S) throw new Error(`脚本没把 ${expect} 挂出来 —— 看看是不是被守卫挡了`);
   return { S, store };
 }
 
