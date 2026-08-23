@@ -42,8 +42,11 @@ export const ORDER = [
 const read = p => fs.readFileSync(p, 'utf8').replace(/\r\n/g, '\n');
 
 export function buildText() {
-  const head = read(SRC('userscript-head.txt'));
-  const open = "(function () {\n'use strict';\n\n";
+  // 版本只有一处事实源：manifest.json（酒馆读它，构建替脚本头/守卫/日志/自检盖章）
+  const version = JSON.parse(read(path.join(ROOT, 'manifest.json'))).version;
+  const head = read(SRC('userscript-head.txt')).replace('{{SHIJU_VERSION}}', version);
+  if (!head.includes('@version      ' + version)) throw new Error('脚本头没盖上版本章');
+  const open = "(function () {\n'use strict';\nconst SHIJU_VERSION = '" + version + "';\n\n";
   const body = ORDER.map(f => read(SRC(f))).join('');
   const close = '})();\n';
   return head + open + body + close;

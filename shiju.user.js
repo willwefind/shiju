@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.16.8
+// @version      0.17.0
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @license      AGPL-3.0
@@ -26,6 +26,7 @@
 /* eslint-disable no-undef */
 (function () {
 'use strict';
+const SHIJU_VERSION = '0.17.0';
 
 // ════════════════════════════════════════════════════════════════════
 //  同一页只许有一份
@@ -40,7 +41,7 @@ if (document.documentElement.dataset[MARK]) {
     document.documentElement.dataset[MARK] + '），这一份让开。');
   return;
 }
-document.documentElement.dataset[MARK] = '0.16.8';
+document.documentElement.dataset[MARK] = SHIJU_VERSION;
 
 // ════════════════════════════════════════════════════════════════════
 //  0. 设置（GM 存储是跨网站共享的 —— 换纸换字设一次，全网通用）
@@ -2501,7 +2502,7 @@ function mountSillyTavern(){
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.8',
+    '脚本版本：' + SHIJU_VERSION,
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,
@@ -2536,8 +2537,9 @@ try {
   });
 } catch {}
 
-console.log('[拾句] 0.16.8 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
-window.__shiju = { planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
+console.log('[拾句] ' + SHIJU_VERSION + ' 已在这一页启动。选中文字会冒出「摘」；不选也行 —— 电脑按 Alt+Q，手机三指轻点。');
+window.__shiju = { SHIJU_VERSION,
+                   planPages, renderPage, makePaper, wrap, paginate, buildItems, shade, strokeFor, inkColorOf,
                    hasFont, fontStack, cjkStack, fontAvailable, resolveFont, titleBlock, chrome,
                    PAPERS, FONTS, LATIN, INKS, SIZES, DEF,
                    installPack, packs, packImg, paperMean, contrast, bestInk, hex2rgb, inkOf, allInks,

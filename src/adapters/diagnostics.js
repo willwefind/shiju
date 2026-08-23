@@ -2,7 +2,7 @@
 function selfCheck(){
   alert([
     '拾句 自检', '',
-    '脚本版本：0.16.8',
+    '脚本版本：' + SHIJU_VERSION,
     `当前页面：${location.href.slice(0, 70)}`,
     `在 iframe 里：${window.top !== window.self ? '是（脚本声明了 @noframes，不在 iframe 里跑）' : '否'}`,
     `GM_download：${typeof GM_download === 'function' ? '有' : '没有 —— 走浏览器自己的下载，一样能存图'}`,

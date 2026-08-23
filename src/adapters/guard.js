@@ -11,5 +11,5 @@ if (document.documentElement.dataset[MARK]) {
     document.documentElement.dataset[MARK] + '），这一份让开。');
   return;
 }
-document.documentElement.dataset[MARK] = '0.16.8';
+document.documentElement.dataset[MARK] = SHIJU_VERSION;
 
