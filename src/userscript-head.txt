@@ -1,0 +1,26 @@
+// ==UserScript==
+// @name         拾句 · 网页摘录成图
+// @namespace    https://github.com/willwefind/shiju
+// @version      0.16.8
+// @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
+// @author       willwefind & Ciel
+// @license      AGPL-3.0
+// @match        *://*/*
+// @updateURL    https://raw.githubusercontent.com/willwefind/shiju/main/shiju.user.js
+// @downloadURL  https://raw.githubusercontent.com/willwefind/shiju/main/shiju.user.js
+// @grant        GM_download
+// @grant        GM_setValue
+// @grant        GM_getValue
+// @grant        GM_xmlhttpRequest
+// @grant        GM_registerMenuCommand
+// @connect      *
+// @run-at       document-idle
+// @noframes
+// ==/UserScript==
+
+// ⚠️ 上面那段 ==UserScript== 里只能放 @xxx，别往里塞普通注释 ——
+//    篡改猴宽容，别家（iOS 的 Userscripts、暴力猴）不一定。
+//    @updateURL / @downloadURL 是让脚本管理器自己去查更新用的；
+//    不写的话，手动粘贴装进去的那一份永远停在原地。
+
+/* eslint-disable no-undef */
