@@ -919,26 +919,3 @@ function shrink(dataUrl){
 const storedBytes = () => cfg('myPapers').reduce((a,p) => a + p.data.length, 0)
                         + cfg('myFonts').reduce((a,f) => a + f.data.length, 0);
 
-// 装素材包。抽成独立函数，好让自测直接喂真文件进来验（不用去点文件选择框）。
-// opt.warm === false：装完**不**预解码。
-// 🔴 预热那一步在浏览器里是必要的（导完包马上点纸，不预热会点开一张白的），
-//    但它的代价是把 20 套 × 竖横两版 = 40 张 2160×2700 全解进内存 ≈ 930MB。
-//    服务端（MCP）没人点纸，只在真要画的那一刻取一张，所以让它能关掉。
-async function installPack(text, opt = {}){
-  const data = JSON.parse(text);
-  const sets = (data.sets || []).filter(s => s.key && (s.portrait || s.landscape));
-  if (!sets.length) throw new Error('这个文件里没有可用的信纸');
-  // 先把这一份记在内存里，再谈存不存得下 —— 存不下（localStorage 只有 ~5MB）也不该
-  // 让刚导进来的纸当场消失。存不下的话回头告诉用户「这次能用，下次还得再导」。
-  const kept = setCfg('packs', sets);
-  _packs = sets; packImgs.clear(); meanCache.clear();
-  installPack.persisted = kept;
-  // 等图真的解码完再说「装好了」，不然点开一张纸是白的
-  if (opt.warm !== false)
-    await Promise.all(sets.flatMap(s => ['portrait','landscape'].map(o => new Promise(r => {
-      const im = packImg(s.key, o); if (!im || im.complete) return r();
-      im.onload = r; im.onerror = r;
-    }))));
-  return sets.length;
-}
-

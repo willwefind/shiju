@@ -23,9 +23,10 @@ export const ORDER = [
   'core/model.js',           // 默认值 DEF —— 内容/样式模型的地基
   'adapters/storage.js',     // GM 存储 / localStorage 退路
   'core/migrate.js',         // titleScale → titleSize 一次性迁移
+  'core/platform.js',        // 平台缝：canvas/image 环境抽象 + 量具工厂
   'core/skin.js',            // 墨色/对比度/版式白名单/内置版式/尺寸表
   'core/fonts.js',           // 字体登记表/探测/字体栈
-  'core/papers.js',          // 纸：程序化生成/素材包/代表色（含平台缝 PLATFORM）
+  'core/papers.js',          // 纸：程序化生成/素材包（含 installPack）/代表色
   'core/typeset.js',         // 避头尾/引号变色/竖排
   'core/paginate.js',        // 正文压流/分页装箱
   'core/layout.js',          // titleBlock/chrome/planPages —— 排版计划

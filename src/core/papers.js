@@ -1,6 +1,8 @@
 // ════════════════════════════════════════════════════════════════════
 //  3. 纸：内置的全部用代码生成，不带素材；用户自己的纸另存
 // ════════════════════════════════════════════════════════════════════
+// 核心边界：这一层允许摸的外部名字只有 cfg/setCfg 和 PLATFORM
+// （myPaper/packs 读 cfg，installPack 写 setCfg('packs')；造图走 PLATFORM.image）。
 // wash = 三层云斑的强度。给大了纸会花成做旧咖啡渍，深色纸尤其敏感，所以逐种调。
 const PAPERS = {
   rice : { name:'宣纸', base:'#f7f5f0', fiber:'rgba(120,105,80,.28)', fibers:240, grain:8, wash:[.15,.11,.09] },
@@ -10,32 +12,6 @@ const PAPERS = {
   // flat = 一点纹理都不加。纯黑就该是纯黑，加了云斑和草屑反而脏。
   black: { name:'纯黑', base:'#000000', flat:true },
 };
-
-// ════════════════════════════════════════════════════════════════════
-//  平台缝：排版/绘制这条路上，只有「造一块画布」和「造一张图」跟环境有关
-// ════════════════════════════════════════════════════════════════════
-// 收在这一处，Node 那边就只要换掉这两个函数，不用垫一整套 DOM ——
-// 这样浏览器和服务端跑的是**同一份文件**，而不是两份会分叉的实现。
-// 面板 UI 里的 createElement 不走这里（那些本来就只在浏览器里活）。
-const PLATFORM = {
-  canvas(w, h){
-    const c = document.createElement('canvas');
-    if (w != null) c.width = w;
-    if (h != null) c.height = h;
-    return c;
-  },
-  image(){ return new Image(); },
-};
-// 加载这份脚本之前先塞一个 globalThis.__shijuPlatform，就能整体替换掉上面两件
-try { if (globalThis.__shijuPlatform) Object.assign(PLATFORM, globalThis.__shijuPlatform); } catch {}
-
-// 量具：排版全程只要「量一段字有多宽」这一件能力。
-// 排版那几个函数（planPages / chrome / titleBlock / wrapVertical）都收一个可选的
-// 量具工厂，不自己去造画布 —— 这样核心离「一个不碰环境的纯排版模块」只差搬家。
-// 🔑 工厂可以每次给新的，也可以每次都返回同一块（省着用）：调用链上每个用量具的
-//    地方都会**先设 font 再量**，所以共用一块是安全的。planPages 里 probe.font
-//    特意设在 chrome() 之后，就是为了共用时不被 chrome 改掉的 font 坑到。
-const newMeasure = () => PLATFORM.canvas().getContext('2d');
 
 function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 
@@ -181,3 +157,26 @@ function drawCover(ctx, src, w, h){
   return true;
 }
 
+
+// 装素材包。抽成独立函数，好让自测直接喂真文件进来验（不用去点文件选择框）。
+// opt.warm === false：装完**不**预解码。
+// 🔴 预热那一步在浏览器里是必要的（导完包马上点纸，不预热会点开一张白的），
+//    但它的代价是把 20 套 × 竖横两版 = 40 张 2160×2700 全解进内存 ≈ 930MB。
+//    服务端（MCP）没人点纸，只在真要画的那一刻取一张，所以让它能关掉。
+async function installPack(text, opt = {}){
+  const data = JSON.parse(text);
+  const sets = (data.sets || []).filter(s => s.key && (s.portrait || s.landscape));
+  if (!sets.length) throw new Error('这个文件里没有可用的信纸');
+  // 先把这一份记在内存里，再谈存不存得下 —— 存不下（localStorage 只有 ~5MB）也不该
+  // 让刚导进来的纸当场消失。存不下的话回头告诉用户「这次能用，下次还得再导」。
+  const kept = setCfg('packs', sets);
+  _packs = sets; packImgs.clear(); meanCache.clear();
+  installPack.persisted = kept;
+  // 等图真的解码完再说「装好了」，不然点开一张纸是白的
+  if (opt.warm !== false)
+    await Promise.all(sets.flatMap(s => ['portrait','landscape'].map(o => new Promise(r => {
+      const im = packImg(s.key, o); if (!im || im.complete) return r();
+      im.onload = r; im.onerror = r;
+    }))));
+  return sets.length;
+}

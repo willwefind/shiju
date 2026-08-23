@@ -6,6 +6,8 @@
 //       · 有的字 Windows 只认英文族名（朝華標題 → ZhaohuaMinA），有的只认中文
 //     猜单个名字猜错＝浏览器静默退回宋体，不报错也看不出来。
 // ════════════════════════════════════════════════════════════════════
+// 核心边界：这一层允许摸的外部名字只有 cfg 和 PLATFORM（fontStack 缺省参数
+// 读 cfg('latinFont')，familyOf/cjkStack 读 cfg('myFonts')；量宽走 PLATFORM）。
 const FONTS = [
   { id:'sys',      name:'系统宋体',  probes:[] },
   { id:'zhuque',   name:'朱雀仿宋',  probes:['Zhuque Fangsong (technical preview)','Zhuque Fangsong (technical prev','朱雀仿宋（预览测试版）','朱雀仿宋'] },
