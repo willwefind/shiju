@@ -49,7 +49,7 @@ export function buildVendorText() {
     '// ── 嵌入导出面（窄）────────────────────────────────────────────',
     '// openPanel(text, init) 是全部入口；其余是素材接线和版本核对用。',
     'window.__shijuEmbed = { SHIJU_VERSION, openPanel, setStudioLocale,',
-    '                        installPack, packs, paperMean, bestInk, planPages, renderPage };',
+    '                        installPack, registerUrlPack, packs, paperMean, bestInk, planPages, renderPage };',
     '',
   ].join('\n');
   const close = '})();\n';
