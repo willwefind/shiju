@@ -16,11 +16,22 @@ const CSS = `
 }
 .pill{position:fixed;z-index:2147483646;background:#12100e;color:#f7f5f0;border:0;border-radius:999px;
       padding:7px 15px;font-size:13px;letter-spacing:.14em;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.3)}
-.mask{position:fixed;inset:0;z-index:2147483647;background:var(--veil);
-      display:flex;align-items:center;justify-content:center;padding:18px}
-.box{background:var(--bg);border-radius:8px;max-width:1240px;width:100%;max-height:95vh;
+/* 🔴 手机上的「整体上移」就出在这儿。软键盘一弹、地址栏一收放，浏览器缩的是
+   **visual viewport**，并且把 layout viewport 往上推；position:fixed 钉的是后者 ——
+   面板于是有一截顶到屏幕外，底下露出网页，看着就像整页往上跑了。
+   带 data-vv 的那条把遮罩直接钉在 visual viewport 上（尺寸由 JS 实时喂）。
+   上面四条 top/right/bottom/left 是兜底：写 inset 简写的话，老一点的
+   安卓内核（X浏览器/Via 那批）整条声明会被丢掉，遮罩缩成内容大小，veil 盖不满屏。 */
+.mask{position:fixed;top:0;right:0;bottom:0;left:0;z-index:2147483647;background:var(--veil);
+      display:flex;align-items:center;justify-content:center;padding:18px;
+      overflow:hidden;overscroll-behavior:contain}
+.mask[data-vv]{right:auto;bottom:auto;
+      left:var(--vvl,0px);top:var(--vvt,0px);width:var(--vvw,100%);height:var(--vvh,100%)}
+/* max-height 跟着遮罩的实高走，不跟 vh —— vh 量的是「地址栏收起时」的大视口，
+   手机上永远比眼前这块屏高一截。 */
+.box{background:var(--bg);border-radius:8px;max-width:1240px;width:100%;max-height:100%;
      display:flex;gap:18px;padding:18px;box-shadow:var(--shadow)}
-.side{width:308px;flex:0 0 308px;overflow:auto;padding-right:6px}
+.side{width:308px;flex:0 0 308px;overflow:auto;overscroll-behavior:contain;padding-right:6px}
 .side h2{margin:0 0 2px;font-size:14px;letter-spacing:.16em;color:var(--fg)}
 .side p.h{margin:0 0 12px;font-size:11px;color:var(--dim)}
 label{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.1em;
@@ -88,7 +99,7 @@ input[type=text]:disabled{opacity:.5}
 .tip{font-size:11px;color:var(--dim);min-height:30px;line-height:1.55;margin-top:8px}
 .view{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .count{font-size:11px;color:var(--dim);letter-spacing:.08em;flex:0 0 auto}
-.pages{flex:1;min-height:0;overflow:auto;display:flex;flex-wrap:wrap;gap:14px;align-content:flex-start;
+.pages{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;display:flex;flex-wrap:wrap;gap:14px;align-content:flex-start;
        justify-content:center;padding:4px}
 .pg{position:relative;cursor:pointer}
 /* touch-action:pinch-zoom —— 整块位移是在画布上按住拖出来的。触屏上不写这一句，
@@ -106,9 +117,12 @@ input[type=text]:disabled{opacity:.5}
 @media (max-width: 760px){
   .mask{padding:0}
   .box{flex-direction:column;gap:10px;padding:12px;border-radius:0;
-       width:100%;height:100dvh;max-height:100dvh}
-  /* 55vh：竖版卡片按屏宽铺开正好这么高，整张能一眼看全，不用滚 */
-  .view{order:-1;flex:0 0 auto;max-height:55vh;min-height:0}
+       width:100%;height:100%;max-height:100%}
+  /* 55%：竖版卡片按屏宽铺开正好这么高，整张能一眼看全，不用滚。
+     原来写的是 55vh —— vh 认的是地址栏收起时的大视口，键盘一弹它比整个面板还高，
+     底下的控制区被挤成零；而 dvh 老内核不认，整条 height 被丢掉。都换成百分比，
+     一路跟着 .box → .mask → visual viewport。 */
+  .view{order:-1;flex:0 0 auto;max-height:55%;min-height:0}
   .pages{padding:0;gap:8px}
   .side{width:auto;flex:1 1 auto;padding-right:0}
   .side h2{font-size:13px}
@@ -125,7 +139,7 @@ input[type=text]:disabled{opacity:.5}
 }
 `;
 
-let host, root, pill, mask, tipEl, hideTimer;
+let host, root, pill, mask, tipEl, hideTimer, vvStop = null;
 let pageCanvases = [], selected = 0;
 
 function ui(){
@@ -154,6 +168,25 @@ function showPill(x, y, text){
   hideTimer = setTimeout(() => { if (pill) pill.hidden = true; }, 7000);
 }
 
+// 把遮罩钉在 visual viewport 上：offsetLeft/Top 抵掉浏览器推 layout viewport 的那一下，
+// width/height 是键盘/地址栏之后**眼前真正剩下**的那块屏。返回撤销函数。
+// 没有 visualViewport 的老浏览器直接走 CSS 里 top/right/bottom/left 那套兜底。
+function trackViewport(el){
+  const vv = window.visualViewport;
+  if (!vv) return () => {};
+  const apply = () => {
+    el.style.setProperty('--vvl', vv.offsetLeft + 'px');
+    el.style.setProperty('--vvt', vv.offsetTop  + 'px');
+    el.style.setProperty('--vvw', vv.width      + 'px');
+    el.style.setProperty('--vvh', vv.height     + 'px');
+  };
+  apply();                       // 先喂尺寸再挂 data-vv，免得有一帧钉在错地方
+  el.setAttribute('data-vv', '');
+  vv.addEventListener('resize', apply);
+  vv.addEventListener('scroll', apply);
+  return () => { vv.removeEventListener('resize', apply); vv.removeEventListener('scroll', apply); };
+}
+
 const p2 = n => String(n).padStart(2, '0');
 const today = () => { const d = new Date(); return `${d.getFullYear()}.${p2(d.getMonth()+1)}.${p2(d.getDate())}`; };
 const stampName = () => { const d = new Date(); return `${d.getFullYear()}${p2(d.getMonth()+1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`; };
@@ -176,6 +209,7 @@ function openPanel(text, init = {}){
   // 嵌入方可为可再分发西文字体提供文件 URL（{latinId: url}）——选中才装载
   const embedFontUrls = (init.fontUrls && typeof init.fontUrls === 'object') ? init.fontUrls : {};
   ui();
+  if (vvStop) { vvStop(); vvStop = null; }
   if (mask) mask.remove();
   const blank = !String(text || '').trim();     // 空手起稿（写日记随笔），不是从网页上摘的
   const st = {
@@ -331,6 +365,7 @@ function openPanel(text, init = {}){
         <div class="pages" id="pgs"></div>
       </div>
     </div>`;
+  vvStop = trackViewport(mask);
   root.append(mask);
 
   const q = s => mask.querySelector(s);
@@ -867,6 +902,7 @@ function openPanel(text, init = {}){
     // 自己的 Esc 监听无条件先摘：被新面板顶替后残留的那份也借这条路自清
     document.removeEventListener('keydown', esc);
     if (!alive()) return;
+    if (vvStop) { vvStop(); vvStop = null; }
     mask.remove(); mask = null;
     // onClose 只在真关掉的那一次响 —— close 本身保持幂等
     if (typeof init.onClose === 'function') try { init.onClose(); } catch {}
