@@ -5,6 +5,7 @@
 
 Claude、ChatGPT、小红书、任何网页都能用。
 **酒馆（SillyTavern）里也能用，而且不用装篡改猴 —— [在它的「扩展」里贴个链接就行](#装进酒馆sillytavern)。**
+**[Our Dialogues 阅读器](https://github.com/willwefind/our-dialogues)（v0.3 起）把拾句内嵌成了写字台** —— 在自己的对话档案里选中一段字，原地就能排。
 
 ![拾句](docs/img/01-文.webp)
 
