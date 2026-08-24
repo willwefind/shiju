@@ -11,9 +11,7 @@
 // @grant        GM_download
 // @grant        GM_setValue
 // @grant        GM_getValue
-// @grant        GM_xmlhttpRequest
 // @grant        GM_registerMenuCommand
-// @connect      *
 // @run-at       document-idle
 // @noframes
 // ==/UserScript==
