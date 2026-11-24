@@ -148,7 +148,7 @@ function ui(){
   host = document.createElement('div');
   host.style.cssText = 'all:initial;position:static';
   root = host.attachShadow({ mode: 'open' });
-  const st = document.createElement('style'); st.textContent = CSS + PICK_CSS + BLIND_CSS; root.append(st);
+  const st = document.createElement('style'); st.textContent = CSS + PICK_CSS + BLIND_CSS + FULL_CSS; root.append(st);
   document.documentElement.append(host);
   pill = null;
 }
@@ -212,6 +212,7 @@ function openPanel(text, init = {}){
   const embedFontUrls = (init.fontUrls && typeof init.fontUrls === 'object') ? init.fontUrls : {};
   ui();
   if (vvStop) { vvStop(); vvStop = null; }
+  if (!init.resume) fullLeave();
   if (mask) mask.remove();
   const blank = !String(text || '').trim();     // 空手起稿（写日记随笔），不是从网页上摘的
   const st = {
@@ -374,7 +375,7 @@ function openPanel(text, init = {}){
       </div>
       <div class="view">
         ${blindHtml()}
-        <div class="count" id="count"></div>
+        ${fullHtml()}
         <div class="pages" id="pgs"></div>
       </div>
     </div>`;
@@ -391,7 +392,7 @@ function openPanel(text, init = {}){
   q('#ts').value = st.titleSize; q('#tsn').value = st.titleSize;
 
   // ── 画 ──────────────────────────────────────────────────────────
-  let plan = null, dragging = false, blindBar = null;
+  let plan = null, dragging = false, blindBar = null, full = null;
   // 盲盒里自己挑了纸 / 字 / 墨，那一样就归自己，别的照旧听种子的
   const ownIt = k => { if (blindBar) blindBar.own(k); };
   // 拖的时候只重画已有的画布，绝不重建 DOM ——
@@ -418,8 +419,10 @@ function openPanel(text, init = {}){
       clearTimeout(fineTimer); rough = !!plan.blind;
       const paint = (cv, i) => (plan.blind ? withDPR(1, () => renderPage(cv, st, plan, i)) : renderPage(cv, st, plan, i));
       plan.pages.forEach((_, i) => {
-        const cols = Math.min(plan.pages.length, 3), wide = `min(calc((100% - ${(cols - 1) * 14}px) / ${cols}), ${plan.W > plan.H ? 620 : 420}px)`;
-        if (same){ const cv = pageCanvases[i]; paint(cv, i); cv.style.cursor = 'default'; cv.parentElement.style.width = wide; return; }
+        const cols = Math.min(plan.pages.length, 3), wide = `min(calc((100% - ${(cols - 1) * 14}px) / ${cols}), var(--pgmax, ${plan.W > plan.H ? 620 : 420}px)`;
+        // 再按高收一道，整张看得全（cqh ＝ 预览区的高）。老内核不认 cqh，后一句赋不进去，就停在前一句
+        const size = el => { el.style.width = wide + ')'; el.style.width = `${wide}, calc(100cqh * ${(plan.W / plan.H).toFixed(4)}))`; };
+        if (same){ const cv = pageCanvases[i]; paint(cv, i); cv.style.cursor = 'default'; size(cv.parentElement); return; }
         const wrapEl = document.createElement('div');
         wrapEl.className = 'pg'; wrapEl.dataset.i = i;
         const cv = document.createElement('canvas');
@@ -427,7 +430,7 @@ function openPanel(text, init = {}){
         // 缩到能并排看下：一张时给大，多张时按张数分
         // 🔴 宽度得给外壳：早先给的是画布，百分比算的是外壳的宽，而外壳自己撑满整行 ——
         //    说是并排，其实一直一张一行往下堆
-        wrapEl.style.width = wide;
+        size(wrapEl);
         cv.style.width = '100%';
         cv.style.cursor = st.blind ? 'default' : 'move';
         // 在预览图上直接拖 = 整块位移。按显示比例换算回真实像素，拖多少就挪多少。
@@ -463,6 +466,7 @@ function openPanel(text, init = {}){
         wrapEl.onclick = () => { selected = i; markSel(); };
         box.append(wrapEl); pageCanvases.push(cv);
       });
+      { const cols = Math.min(plan.pages.length, 3), rows = Math.ceil(plan.pages.length / cols); mask.style.setProperty('--need', `calc((100vw - 24px) * ${(plan.H / plan.W / cols * rows).toFixed(4)})`); }
       if (selected >= plan.pages.length) selected = plan.pages.length - 1;
       markSel();
       // 张数、尺寸、以及「没照你说的办」的时候必须说出来，不能默默给个别的结果
@@ -653,8 +657,8 @@ function openPanel(text, init = {}){
     const { resume, ...rest } = init, tab = mask.querySelector('#tabs button[aria-pressed=true]');
     Object.assign(st, { text: q('#t').value, title: q('#ti').value, source: q('#s').value, date: q('#d').value, headText: q('#hd').value, sourcePrefix: q('#sp').value });
     setCfg('uiLang', studioLocale === 'en' ? 'zh-CN' : 'en');
-    document.removeEventListener('keydown', esc); pick.dispose(); clearTimeout(fineTimer); clearTimeout(typingTimer);
-    openPanel(st.text, { ...rest, resume: { st, tab: tab ? tab.dataset.v : 'text', blind: blindBar.state() } });
+    document.removeEventListener('keydown', esc); pick.dispose(); full.dispose(); clearTimeout(fineTimer); clearTimeout(typingTimer);
+    openPanel(st.text, { ...rest, resume: { st, tab: tab ? tab.dataset.v : 'text', blind: blindBar.state(), full: full.state() } });
   };
 
   const mkSwitch = (sel, key) => q(sel).addEventListener('click', e => {
@@ -973,13 +977,15 @@ function openPanel(text, init = {}){
       setCfg('presets', (cfg('presets') || []).concat([{ id: 'ps' + Date.now(), name, style }]));
       buildPresets();
     } });
+  full = mountFull({ resume: back && back.full, mask, alive, tipEl });
   q('#hd').oninput = () => { setCfg('headText', q('#hd').value); drawTyping(); };
 
   const close = () => {
     // 自己的 Esc 监听无条件先摘：被新面板顶替后残留的那份也借这条路自清
     document.removeEventListener('keydown', esc);
-    pick.dispose();
+    pick.dispose(); full.dispose();
     if (!alive()) return;
+    fullLeave();
     if (vvStop) { vvStop(); vvStop = null; }
     mask.remove(); mask = null;
     // onClose 只在真关掉的那一次响 —— close 本身保持幂等
@@ -991,8 +997,8 @@ function openPanel(text, init = {}){
   let downOnMask = false;
   mask.addEventListener('pointerdown', e => { downOnMask = e.target === mask; }, true);
   mask.onclick = e => { if (e.target === mask && downOnMask) close(); };
-  // 正选着字的时候，Esc 先放开选中的字，再按一次才关面板
-  const esc = e => { if (e.key === 'Escape' && !(alive() && (pick.drop() || blindBar.drop()))) close(); };
+  // 正选着字的时候，Esc 先放开选中的字，再退全屏，再按一次才关面板
+  const esc = e => { if (e.key === 'Escape' && !(alive() && (pick.drop() || blindBar.drop() || full.drop()))) close(); };
   document.addEventListener('keydown', esc);
 
   // ── 存 / 复制 ───────────────────────────────────────────────────

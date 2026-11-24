@@ -50,8 +50,9 @@ const BLIND_CSS = `
 .bsel u{right:-9px;top:-9px;cursor:pointer}
 @media (pointer: coarse){ .bov{pointer-events:none} .mask.bedit .bov{pointer-events:auto;touch-action:none} .bsel i,.bsel u{width:26px;height:26px;line-height:24px} }
 @media (max-width: 760px){
-  .bbar button{padding:9px 13px}
-  .bbar button.go{padding:10px 18px}
+  .bbar{gap:4px}
+  .bbar button{padding:9px 9px;letter-spacing:0}
+  .bbar button.go{padding:10px 14px;letter-spacing:.06em}
   .bbar .nm{flex:1 1 100%;order:5}
   .mask.blind .view{max-height:62%}
   .bx .chips button{padding:8px 12px;font-size:12px}

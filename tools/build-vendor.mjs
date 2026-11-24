@@ -48,6 +48,7 @@ export const VENDOR_ORDER = [
   'studio/studio-i18n.js',
   'studio/studio-pick.js',
   'studio/studio-blind.js',
+  'studio/studio-full.js',
   'studio/studio-shell.js',
 ];
 

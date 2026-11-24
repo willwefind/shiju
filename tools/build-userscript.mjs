@@ -48,6 +48,7 @@ export const ORDER = [
   'studio/studio-i18n.js',   // Studio 界面语言（zh-CN/en 词典 + t()）
   'studio/studio-pick.js',   // 选中即改：只改选中的那几个字
   'studio/studio-blind.js',  // 版式盲盒的按钮条
+  'studio/studio-full.js',   // 全屏
   'studio/studio-shell.js',  // Shadow DOM 面板全部界面
   'adapters/selection.js',   // 选区监听/Alt+Q/三指轻点
   'adapters/sillytavern.js', // 酒馆扩展入口
