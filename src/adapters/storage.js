@@ -20,6 +20,7 @@ const cfg = k => { const v = rawCfg(k); return v === undefined ? DEF[k] : v; };
 // 返回「到底存下没有」—— localStorage 会因为超配额而失败，失败了就得让人知道
 const setCfg = (k, v) => {
   try {
+    if (k === 'myFonts' && typeof dropFontList === 'function') dropFontList();
     if (hasGM) GM_setValue(k, v); else localStorage.setItem(LSK + k, JSON.stringify(v));
     return true;
   } catch (e) { console.warn('[拾句] 存不下设置：', e.message); return false; }

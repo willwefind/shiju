@@ -7,25 +7,31 @@ const titleFontSize = st => Math.max(12, Math.min(300, Math.round(st.titleSize |
 // 标题排好之后占多高。只印第一页，但**每页都按它预留**——
 // 各页版心一样高，正文垂直居中才对得齐，也绝不会溢出。
 function titleBlock(st, COL, availH, mk){
-  const t = (st.title || '').trim();
-  if (!t) return { lines: [], h: 0, w: 0, size: 0, lh: 0, vertical: false };
+  const raw = st.title || '', t = raw.trim();
+  if (!t) return { lines: [], rows: [], h: 0, w: 0, size: 0, lh: 0, vertical: false };
   const size = titleFontSize(st);
   const lh = Math.round(size * 1.42);
   const ctx = (mk || newMeasure)();
   // 🔴 latinFont 必须显式从 st 传：不传的话 fontStack 会去读存储里的配置，
   //    当前状态被无声忽略 —— 会变成「选了西文字体却没反应」。
-  ctx.font = `${size}px ${titleStack(st)}`;
+  const stack = titleStack(st), font = `${size}px ${stack}`;
+  const rich = richOf(st.titleSpans, raw.length, { size, stack, weight: st.titleWeight }, st);
+  const lead0 = raw.length - raw.trimStart().length;      // 下标是按没去空白的原串记的
+  const flow = opt => [...t.matchAll(/[^\n]+/g)].flatMap(m =>
+    flowRows(ctx, m[0], sliceRich(rich, lead0 + m.index, lead0 + m.index + m[0].length),
+             { size, lead: 1.42, font, ...opt }));
+  const sum = rows => rows.reduce((a, r) => a + r.h, 0);
   // 标题的排向跟正文分开定：竖排正文配横标题是常见排法，配竖标题也是，让用户自己挑
   if (st.titleVertical){
-    const cols = t.split(/\n+/).flatMap(line => wrapVertical(line, size, availH || 600, ctx));
-    const longest = cols.reduce((a, c) => Math.max(a, vAdvance(ctx, c, size)), 0);
-    return { lines: cols, vertical: true, size, lh,
-             w: cols.length * lh + Math.round(size * 0.6),
+    const rows = flow({ vertical: true, cross: availH || 600 });
+    const longest = rows.reduce((a, r) => { ctx.font = font; return Math.max(a, vAdvance(ctx, r.text, size, r.rich)); }, 0);
+    return { lines: rows.map(r => r.text), rows, vertical: true, size, lh,
+             w: sum(rows) + Math.round(size * 0.6),
              h: longest + Math.round(size * 0.9) };
   }
-  const lines = t.split(/\n+/).flatMap(line => wrap(ctx, line, COL));
-  return { lines, vertical: false, size, lh, w: COL,
-           h: lines.length * lh + Math.round(size * 0.9) };
+  const rows = flow({ vertical: false, cross: COL });
+  return { lines: rows.map(r => r.text), rows, vertical: false, size, lh, w: COL,
+           h: sum(rows) + Math.round(size * 0.9) };
 }
 
 // 版心之外那些固定占位。竖排时题头/出处/日期是竖着排在左右两侧的，
@@ -40,7 +46,7 @@ function chrome(st, COL, availH, mk){
   const src  = st.showSource ? (st.source || '').trim() : '';
   const date = st.showDate ? (st.date || '').trim() : '';
   const ctx = (mk || newMeasure)();
-  const stack = fontStack(st.font, st.latinFont);
+  const stack = st.stack || fontStack(st.font, st.latinFont);
 
   if (st.vertical){
     const colH = (availH || 600) - (tb.vertical ? 0 : tb.h);
@@ -73,9 +79,10 @@ function chrome(st, COL, availH, mk){
 }
 
 function planPages(st, mk){
+  if (st.blind){ const p = planBlind(st, mk); if (p) return p; }     // 没有字可排就照常
   const S = SIZES[st.orient] || SIZES.portrait;
   const COL0 = S.w - S.pad * 2;
-  const stack = fontStack(st.font, st.latinFont);
+  const stack = st.stack || fontStack(st.font, st.latinFont);      // st.stack：盲盒内页直接给定字体栈
   const probe = (mk || newMeasure)();
   // 竖标题的列长受版心高度限制，而版心高度又要先知道标题占多少 —— 先按整页高度估一轮
   const ch = chrome(st, COL0, S.h - S.pad*2, mk);
@@ -84,7 +91,8 @@ function planPages(st, mk){
   probe.font = `${st.fontSize}px ${stack}`;
   // 版心高度。按最坏情况留（题头、标题、出处都按每页都在算）：牺牲一点留白，换绝不溢出
   const box0 = S.h - S.pad*2 - ch.head - ch.title - ch.src - ch.foot;
-  const { items } = buildItems(probe, st.text, st.vertical ? box0 : COL0, st.fontSize, st.vertical);
+  const rich = richOf(st.spans, st.text.length, { size: st.fontSize, stack, weight: st.weight }, st);
+  const { items } = buildItems(probe, st.text, st.vertical ? box0 : COL0, st.fontSize, st.vertical, rich);
   // 横排流向是往下，装不下就加高；竖排流向是往左，装不下就加宽
   const cap0 = st.vertical ? (COL0 - ch.headW - ch.titleW - ch.metaW) : box0;
   const forceN = st.pages === 'auto' ? 0 : Math.max(1, parseInt(st.pages, 10) || 1);

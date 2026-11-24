@@ -6,4 +6,6 @@ window.__shiju = { SHIJU_VERSION,
                    installPack, registerUrlPack, packs, packImg, paperMean, contrast, bestInk, hex2rgb, inkOf, allInks,
                    titleStack, familyOf, TAGLINES, wrapVertical, drawColumn, alignOffset, vAdvance,
                    STYLE_KEYS, BUILTIN_PRESETS,
+                   planBlind, bClauses, bUnits, bWords, blindSeed, BLIND_COMPS, B_PALETTES, B_FX_ORDER, bTune, bIsQuiet, bLookOk, bLch, bIsMud, bPalW, bAnchor, bGlowColors, bHueGap, bKin,  withDPR, BLIND_LOOKS, BLIND_LONG, bParas, B_ART, blindAvg, BLIND_GROUND, blindFor, BLIND_FX, BLIND_POST, B_POST_ORDER, B_IMAGE_OF, B_PICTO, BLIND_ITEMS, B_SHAPES, blindNewItem, blindItemBox,
+                   splitParas, richOf, paintSpans, shiftSpans, spanCommon,
                    openPanel, selfCheck, trySelection };

@@ -9,7 +9,7 @@ import { bootShiju, readCfg } from './boot.mjs';
 
 test('STYLE_KEYS 全部在 DEF 里，内容键全不在', () => {
   const { S } = bootShiju();
-  assert.equal(S.STYLE_KEYS.length, 29);
+  assert.equal(S.STYLE_KEYS.length, 30);
   for (const k of S.STYLE_KEYS) assert.ok(k in S.DEF, `STYLE_KEYS 的 ${k} 不在 DEF`);
   for (const k of ['text', 'title', 'source', 'date']) {
     assert.ok(!S.STYLE_KEYS.includes(k), `内容键 ${k} 混进了版式白名单`);

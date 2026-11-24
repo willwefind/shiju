@@ -1,4 +1,20 @@
+// 铺纸。图还没解码完就先拿宣纸垫着。
+const groundPhoto = st => st.paper.startsWith('pk:') ? packImg(st.paper.slice(3), st.orient)
+                        : st.paper.startsWith('my:') ? myPaper(st.paper.slice(3)) : null;
+function drawGround(ctx, st, W, H, idx){
+  const photo = groundPhoto(st);
+  if (!(photo && drawCover(ctx, photo, W, H))) ctx.drawImage(makePaper(photo ? 'rice' : st.paper, W, H, idx), 0, 0);
+
+  // 纸张明暗：盖一层白/黑。alpha 与 shade() 用的是同一个 t，两边算出来的颜色一致。
+  const pl = (st.paperLight || 0) / 100;
+  if (pl){
+    ctx.fillStyle = pl > 0 ? `rgba(255,255,255,${pl})` : `rgba(0,0,0,${-pl})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
 function renderPage(canvas, st, plan, idx){
+  if (plan.blind) return renderBlind(canvas, st, plan, idx);
   const { S, W, H, COL, box, stack, pages, ch, title } = plan;
   const ctx = canvas.getContext('2d');
   const ink = inkColorOf(st);
@@ -22,16 +38,9 @@ function renderPage(canvas, st, plan, idx){
   canvas.width = W * DPR; canvas.height = H * DPR;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-  const photo = st.paper.startsWith('pk:') ? packImg(st.paper.slice(3), st.orient)
-              : st.paper.startsWith('my:') ? myPaper(st.paper.slice(3)) : null;
-  if (!(photo && drawCover(ctx, photo, W, H))) ctx.drawImage(makePaper(photo ? 'rice' : st.paper, W, H, idx), 0, 0);
-
-  // 纸张明暗：盖一层白/黑。alpha 与 shade() 用的是同一个 t，两边算出来的颜色一致。
-  const pl = (st.paperLight || 0) / 100;
-  if (pl){
-    ctx.fillStyle = pl > 0 ? `rgba(255,255,255,${pl})` : `rgba(0,0,0,${-pl})`;
-    ctx.fillRect(0, 0, W, H);
-  }
+  if (st.noGround){ /* 透明底：什么都不铺 */ }
+  else if (plan.ground) plan.ground(ctx, idx);      // 盲盒的内页：跟封面同一张底
+  else drawGround(ctx, st, W, H, idx);
 
   ctx.textBaseline = 'top';
   let y = S.pad;
@@ -45,19 +54,23 @@ function renderPage(canvas, st, plan, idx){
   }
   y += ch.head;
 
+  // 每画一行都先把 font 设回来：有局部样式的行会把它改掉
+  const titleFont = `${title.size}px ${titleStack(st)}`;
+  const bodyFont  = `${st.fontSize}px ${stack}`;
+
   // 标题：只印第一页。横排正文时它占顶上那条带（横竖两种排向都在这条带里画）
   if (ch.title){
     if (idx === 0){
-      ctx.font = `${title.size}px ${titleStack(st)}`;
       const tsw = strokeFor(st.titleWeight, title.size);
       if (title.vertical){
         // 竖标题立在这条带里，列从右往左；titleAlign 管这一叠列往哪边靠
-        const bw = title.lines.length * title.lh;
+        const bw = title.rows.reduce((a, r) => a + r.h, 0);
         let tx = S.pad + alignOffset(st.titleAlign, COL, bw) + bw, tqd = 0;
-        for (const col of title.lines){
-          tx -= title.lh;
-          drawColumn(ctx, tx, y, col, title.size, ink, quote, tsw, tqd);
-          tqd = quoteDepthAfter(col, tqd);
+        for (const row of title.rows){
+          tx -= row.h;
+          ctx.font = titleFont;
+          drawColumn(ctx, tx, y, row.text, title.size, ink, quote, tsw, tqd, row.rich);
+          tqd = quoteDepthAfter(row.text, tqd);
         }
         if (st.titleRule !== false){
           ctx.fillStyle = rule;
@@ -66,11 +79,12 @@ function renderPage(canvas, st, plan, idx){
         }
       } else {
         let ty = y, tqd = 0;
-        for (const ln of title.lines){
-          const w = ctx.measureText(ln).width;
-          drawRich(ctx, S.pad + alignOffset(st.titleAlign, COL, w), ty, ln, ink, quote, tsw, tqd);
-          tqd = quoteDepthAfter(ln, tqd);
-          ty += title.lh;
+        for (const row of title.rows){
+          ctx.font = titleFont;
+          const w = textWidth(ctx, row.text, row.rich);
+          drawRich(ctx, S.pad + alignOffset(st.titleAlign, COL, w), ty, row.text, ink, quote, tsw, tqd, row.rich);
+          tqd = quoteDepthAfter(row.text, tqd);
+          ty += row.h;
         }
         // 标题下的短横跟着标题走，不然居左的标题配居中的横线会很怪
         if (st.titleRule !== false){
@@ -87,7 +101,6 @@ function renderPage(canvas, st, plan, idx){
   // 各页用同一个版心尺寸，所以整叠看起来是齐的。
   const used = pages[idx].reduce((a, it) => a + it.h, 0);
   const ox = st.offsetX || 0, oy = st.offsetY || 0;
-  ctx.font = `${st.fontSize}px ${stack}`;
   const sw = strokeFor(st.weight, st.fontSize);
 
   if (st.vertical){
@@ -110,27 +123,29 @@ function renderPage(canvas, st, plan, idx){
 
     // 竖标题自成一栏，紧挨着题头的左边
     if (idx === 0 && ch.titleW){
-      ctx.font = `${title.size}px ${titleStack(st)}`;
       const tsw = strokeFor(st.titleWeight, title.size);
       let tx = S.pad + COL - ch.headW - Math.round(title.size * 0.3), tqd = 0;
-      for (const col of title.lines){
-        tx -= title.lh;
-        drawColumn(ctx, tx, top + alignOffset(st.titleAlign, colH, vAdvance(ctx, col, title.size)),
-                   col, title.size, ink, quote, tsw, tqd);
-        tqd = quoteDepthAfter(col, tqd);
+      for (const row of title.rows){
+        tx -= row.h;
+        ctx.font = titleFont;
+        const h = vAdvance(ctx, row.text, title.size, row.rich);
+        ctx.font = titleFont;
+        drawColumn(ctx, tx, top + alignOffset(st.titleAlign, colH, h),
+                   row.text, title.size, ink, quote, tsw, tqd, row.rich);
+        tqd = quoteDepthAfter(row.text, tqd);
       }
       if (st.titleRule !== false){ ctx.fillStyle = rule; ctx.fillRect(bandR, top, 1, colH); }
     }
 
-    ctx.font = `${st.fontSize}px ${stack}`;
     let x = bandR - Math.max(0, (band - used) / 2) + ox;
     let qd = quoteDepthAtPage(pages, idx);
     for (const it of pages[idx]){
       x -= it.h;
       if (it.gap){ qd = 0; continue; }
-      const h = vAdvance(ctx, it.text, st.fontSize);
+      ctx.font = bodyFont;
+      const h = vAdvance(ctx, it.text, st.fontSize, it.rich);
       const cy = top + alignOffset(st.align, colH, h) + oy;
-      drawColumn(ctx, x, cy, it.text, st.fontSize, ink, quote, sw, qd);
+      drawColumn(ctx, x, cy, it.text, st.fontSize, ink, quote, sw, qd, it.rich);
       qd = quoteDepthAfter(it.text, qd);
     }
 
@@ -158,8 +173,9 @@ function renderPage(canvas, st, plan, idx){
     for (const it of pages[idx]){
       if (it.gap) qd = 0;                      // 换段就把没闭合的引号忘掉
       else {
-        const w = ctx.measureText(it.text).width;
-        drawRich(ctx, S.pad + alignOffset(st.align, COL, w) + ox, y, it.text, ink, quote, sw, qd);
+        ctx.font = bodyFont;
+        const w = textWidth(ctx, it.text, it.rich);
+        drawRich(ctx, S.pad + alignOffset(st.align, COL, w) + ox, y, it.text, ink, quote, sw, qd, it.rich);
         qd = quoteDepthAfter(it.text, qd);
       }
       y += it.h;

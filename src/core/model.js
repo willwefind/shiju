@@ -23,6 +23,7 @@ const DEF = {
   // 引号里那段话的颜色。auto = 跟着纸深浅自动定（原来的橙）；same = 跟正文一个色
   // （＝不给引号变色）；也可以指定任何一支墨或直接一个 #rrggbb。
   quoteInk: 'auto',
+  blind: null,          // 版式盲盒 {seed, own, calm}。null = 普通版式；只随版式预设存，不跨面板记
   presets: [],          // [{id,name,style}] 存下来的版式
   headRule: true,       // 题头下那道线
   titleRule: true,      // 标题下那道短横

@@ -108,6 +108,7 @@ input[type=text]:disabled{opacity:.5}
 .pg canvas{display:block;max-width:100%;box-shadow:0 6px 20px rgba(0,0,0,.18);border-radius:2px;
        outline:2px solid transparent;outline-offset:3px;touch-action:pinch-zoom}
 .pg[aria-selected=true] canvas{outline-color:rgba(185,32,11,.7)}
+.mask.bare .pg canvas{background:repeating-conic-gradient(#d9d9d9 0 25%,#f4f4f4 0 50%) 0 0/18px 18px}
 .pg span{position:absolute;left:6px;top:6px;background:rgba(18,16,14,.72);color:#faf8f4;
        font-size:10px;padding:1px 6px;border-radius:3px}
 
@@ -147,7 +148,7 @@ function ui(){
   host = document.createElement('div');
   host.style.cssText = 'all:initial;position:static';
   root = host.attachShadow({ mode: 'open' });
-  const st = document.createElement('style'); st.textContent = CSS; root.append(st);
+  const st = document.createElement('style'); st.textContent = CSS + PICK_CSS + BLIND_CSS; root.append(st);
   document.documentElement.append(host);
   pill = null;
 }
@@ -220,6 +221,9 @@ function openPanel(text, init = {}){
     headText: cfg('headText'),
     date  : init.date != null ? String(init.date) : today(),
     title: init.title != null ? String(init.title) : '',
+    blind: null,                    // 版式盲盒：null = 普通版式
+    noGround: false,                // 透明底：不铺纸，存成 PNG
+    spans: [], titleSpans: [],      // 选中的字单独改过的样式（spans.js）
     paper: cfg('paper'), font: cfg('font'), fontSize: cfg('fontSize'), ink: cfg('ink'),
     orient: cfg('orient'), pages: cfg('pages'),
     weight: cfg('weight'), latinFont: cfg('latinFont'),
@@ -257,6 +261,7 @@ function openPanel(text, init = {}){
           <button data-v="text">${t('tab.text')}</button><button data-v="paper">${t('tab.paper')}</button>
           <button data-v="font">${t('tab.font')}</button><button data-v="ink">${t('tab.ink')}</button>
           <button data-v="layout">${t('tab.layout')}</button>
+          <button data-v="box" hidden>${t('tab.box')}</button>
         </div>
 
         <div class="pane" data-p="text">
@@ -269,7 +274,9 @@ function openPanel(text, init = {}){
               <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
           </div>
           <label>${t('text.body')}<span class="sw"><span style="font-size:10px">${t('text.sizeWeight')}</span></span></label>
-          <textarea id="t"></textarea>
+          <div class="ta"><div class="bk" aria-hidden="true"><div></div></div><textarea id="t"></textarea></div>
+          ${pickHtml()}
+          <p class="pkhint" id="pkHint">&nbsp;<button id="pkReset" hidden>${t('pick.reset')}</button></p>
           <div class="fs" style="margin-top:6px">
             <input type="range" id="fs" min="20" max="96" step="1">
             <input type="number" id="fsn" min="12" max="200" step="1">
@@ -353,6 +360,8 @@ function openPanel(text, init = {}){
           </div>
         </div>
 
+        ${blindPaneHtml()}
+        <label style="margin:14px 0 -6px">${t('act.bare')}<span class="sw" id="bare"><button data-v="0">${t('sw.off')}</button><button data-v="1">${t('sw.on')}</button></span></label>
         <div class="acts">
           <button class="save" id="save">${t('act.save')}</button>
           <button class="copy" id="copy">${t('act.copy')}</button>
@@ -361,6 +370,7 @@ function openPanel(text, init = {}){
         <div class="tip" id="tip"></div>
       </div>
       <div class="view">
+        ${blindHtml()}
         <div class="count" id="count"></div>
         <div class="pages" id="pgs"></div>
       </div>
@@ -378,7 +388,9 @@ function openPanel(text, init = {}){
   q('#ts').value = st.titleSize; q('#tsn').value = st.titleSize;
 
   // ── 画 ──────────────────────────────────────────────────────────
-  let plan = null, dragging = false;
+  let plan = null, dragging = false, blindBar = null;
+  // 盲盒里自己挑了纸 / 字 / 墨，那一样就归自己，别的照旧听种子的
+  const ownIt = k => { if (blindBar) blindBar.own(k); };
   // 拖的时候只重画已有的画布，绝不重建 DOM ——
   // 🔴 早先 draw() 每次都把预览区整个清空重建，正在拖的那个 canvas 当场被销毁，
   //    指针捕获立刻断掉，于是「只能拖动一下下」。不是范围小，是只生效了一帧。
@@ -386,6 +398,10 @@ function openPanel(text, init = {}){
     if (!alive() || !plan) return;
     pageCanvases.forEach((cv, i) => { if (plan.pages[i]) renderPage(cv, st, plan, i); });
   };
+  // 盲盒一张要好几道效果，满尺寸画一遍不便宜：预览先出草样，手停下来再补成导出的尺寸
+  let fineTimer = 0, rough = false;
+  const finish = () => { clearTimeout(fineTimer); if (!rough || !plan || !alive()) return; rough = false; pageCanvases.forEach((cv, i) => { if (plan.pages[i]) renderPage(cv, st, plan, i); }); };
+  const settle = () => (typeof requestIdleCallback === 'function' ? requestIdleCallback(() => finish(), { timeout: 2500 }) : finish());      // 等浏览器真闲下来再补
   const draw = () => {
     if (!alive()) return;
     st.text = q('#t').value; st.source = q('#s').value; st.date = q('#d').value;
@@ -394,19 +410,26 @@ function openPanel(text, init = {}){
     if (dragging){ redrawOnly(); return; }
     try {
       plan = planPages(st);
-      const box = q('#pgs');
-      box.textContent = ''; pageCanvases = [];
+      const box = q('#pgs'), same = !!plan.blind && pageCanvases.length === plan.pages.length && box.children.length === plan.pages.length;
+      if (!same){ box.textContent = ''; pageCanvases = []; }
+      clearTimeout(fineTimer); rough = !!plan.blind;
+      const paint = (cv, i) => (plan.blind ? withDPR(1, () => renderPage(cv, st, plan, i)) : renderPage(cv, st, plan, i));
       plan.pages.forEach((_, i) => {
+        const cols = Math.min(plan.pages.length, 3), wide = `min(calc((100% - ${(cols - 1) * 14}px) / ${cols}), ${plan.W > plan.H ? 620 : 420}px)`;
+        if (same){ const cv = pageCanvases[i]; paint(cv, i); cv.style.cursor = 'default'; cv.parentElement.style.width = wide; return; }
         const wrapEl = document.createElement('div');
         wrapEl.className = 'pg'; wrapEl.dataset.i = i;
         const cv = document.createElement('canvas');
-        renderPage(cv, st, plan, i);
+        paint(cv, i);
         // 缩到能并排看下：一张时给大，多张时按张数分
-        const per = plan.pages.length === 1 ? 1 : (plan.pages.length === 2 ? .5 : .33);
-        cv.style.width = `min(${Math.round(per*100)}% , ${plan.W > plan.H ? 620 : 420}px)`;
-        cv.style.cursor = 'move';
+        // 🔴 宽度得给外壳：早先给的是画布，百分比算的是外壳的宽，而外壳自己撑满整行 ——
+        //    说是并排，其实一直一张一行往下堆
+        wrapEl.style.width = wide;
+        cv.style.width = '100%';
+        cv.style.cursor = st.blind ? 'default' : 'move';
         // 在预览图上直接拖 = 整块位移。按显示比例换算回真实像素，拖多少就挪多少。
         cv.onpointerdown = e => {
+          if (st.blind) return;          // 盲盒里没有「整块位移」这回事
           e.preventDefault();
           const scale = plan.W / cv.getBoundingClientRect().width;
           const sx = e.clientX, sy = e.clientY, bx = st.offsetX || 0, by = st.offsetY || 0;
@@ -444,13 +467,24 @@ function openPanel(text, init = {}){
       const grew = plan.H > S0.h || plan.W > S0.w;
       const want = st.pages === 'auto' ? 0 : parseInt(st.pages, 10);
       const notes = [];
+      if (plan.blind && plan.pages.length > 1) notes.push(t('blind.coverNote', { n: plan.pages.length - 1 }));
       if (grew) notes.push(t('count.grewNote'));
       if (want && plan.pages.length < want) notes.push(t('count.fewerNote', { want, got: plan.pages.length }));
       q('#count').textContent =
         t('count.pages', { n: plan.pages.length, w: plan.W, h: plan.H, ew: plan.W*DPR, eh: plan.H*DPR })
         + (notes.length ? t('count.notesGlue') + notes.join(t('count.notesJoin')) : '');
+      // 盲盒可能抽中一张还没解码完的信纸：先垫纯色，解完再画一次
+      if (plan.blind && plan.blind.pal.paper){
+        const im = groundPhoto({ paper: plan.blind.pal.paper, orient: st.orient });
+        if (im && !im.complete) im.addEventListener('load', draw, { once: true });
+      }
+      if (blindBar) blindBar.refresh(plan);
+      if (rough) fineTimer = setTimeout(settle, 1600);
     } catch (e){ tipEl.textContent = t('count.renderFail', { msg: e.message }); }
   };
+  // 打字的时候盲盒别一字一画（一张要一两百毫秒），停手再画
+  let typingTimer;
+  const drawTyping = () => { clearTimeout(typingTimer); if (st.blind) typingTimer = setTimeout(draw, 240); else draw(); };
   const markSel = () => mask.querySelectorAll('.pg').forEach(el =>
     el.setAttribute('aria-selected', +el.dataset.i === selected));
 
@@ -525,7 +559,7 @@ function openPanel(text, init = {}){
     }
     box.addEventListener('click', e => {
       const b = e.target.closest('button'); if (!b) return;
-      st.ink = b.dataset.v; setCfg('ink', st.ink); sync(); draw();
+      st.ink = b.dataset.v; setCfg('ink', st.ink); ownIt('ink'); sync(); draw();
     });
   }
   mkRow('#align',  [{v:'left',n:t('align.left')},{v:'center',n:t('align.center')},{v:'right',n:t('align.right')}], 'align');
@@ -545,7 +579,8 @@ function openPanel(text, init = {}){
   // ── 版式预设（不只是文字排版，纸/字/色都在里面，所以叫版式）────────────────────────────────────────────────────
   const allPresets = () => BUILTIN_PRESETS.concat(cfg('presets') || []);
   function applyPreset(p){
-    for (const k of STYLE_KEYS) if (k in p.style){ st[k] = p.style[k]; setCfg(k, st[k]); }
+    for (const k of STYLE_KEYS) if (k in p.style && k !== 'blind'){ st[k] = p.style[k]; setCfg(k, st[k]); }
+    st.blind = blindFor(p.style.blind || null, q('#t').value, q('#ti').value);
     q('#hd').value = st.headText; q('#sp').value = st.sourcePrefix;
     q('#fs').value = Math.max(20, Math.min(96, st.fontSize)); q('#fsn').value = st.fontSize;
     q('#ts').value = Math.max(20, Math.min(140, st.titleSize)); q('#tsn').value = st.titleSize;
@@ -594,6 +629,7 @@ function openPanel(text, init = {}){
     const b = e.target.closest('button'); if (!b) return;
     mask.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-pressed', x === b));
     mask.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.p === b.dataset.v));
+    if (blindBar) blindBar.editing(b.dataset.v === 'box');
   });
   q('#tw').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
@@ -639,7 +675,7 @@ function openPanel(text, init = {}){
     b.append(thumb);
     const cap = document.createElement('b'); cap.textContent = label; b.append(cap);
     b.onclick = () => {
-      st.paper = value; setCfg('paper', st.paper);
+      st.paper = value; setCfg('paper', st.paper); ownIt('paper');
       const swapped = autoInk();
       sync(); draw();
       if (swapped) tipEl.textContent = t('paper.autoInkSwapped', { name: swapped });
@@ -751,6 +787,22 @@ function openPanel(text, init = {}){
     return b;
   }
 
+  // 「指名要某一款」的字单：中文、自装、西文排在一列。标题字体和选中的字共用这一份。
+  function fillFonts(tb, firstLabel, withSys){
+    tb.textContent = '';
+    tb.append(fontRow('same', firstLabel, null, ''));
+    for (const f of FONTS){
+      if ((!f.probes.length && !withSys) || !fontAvailable(f)) continue;
+      tb.append(fontRow(f.id, tName('font', f.id, f.name), cjkStack(f.id), t('font.hintCjk')));
+    }
+    for (const f of cfg('myFonts')) tb.append(fontRow(f.id, f.name, `"${f.id}"`, t('font.hintCustom')));
+    for (const l of LATIN){
+      if (!l.probes.length) continue;
+      const hit = resolveFont(l); if (!hit) continue;
+      tb.append(fontRow(l.id, `${l.name} — Aa`, `"${hit}"`, l.hint ? tName('hint', l.id, l.hint) : t('font.hintLatin')));
+    }
+  }
+
   function buildFonts(){
     // 正文字体
     const box = q('#font'); box.textContent = '';
@@ -797,18 +849,7 @@ function openPanel(text, init = {}){
     }
 
     // 标题字体：中文和英文都能挑（挑了英文字，汉字会自动落回正文的中文字体）
-    const tb = q('#swTitleFont'); tb.textContent = '';
-    tb.append(fontRow('same', t('font.sameAsBody'), null, ''));
-    for (const f of FONTS){
-      if (!f.probes.length || !fontAvailable(f)) continue;
-      tb.append(fontRow(f.id, tName('font', f.id, f.name), cjkStack(f.id), t('font.hintCjk')));
-    }
-    for (const f of cfg('myFonts')) tb.append(fontRow(f.id, f.name, `"${f.id}"`, t('font.hintCustom')));
-    for (const l of LATIN){
-      if (!l.probes.length) continue;
-      const hit = resolveFont(l); if (!hit) continue;
-      tb.append(fontRow(l.id, `${l.name} — Aa`, `"${hit}"`, l.hint ? tName('hint', l.id, l.hint) : t('font.hintLatin')));
-    }
+    fillFonts(q('#swTitleFont'), t('font.sameAsBody'), false);
 
     const add = document.createElement('button');
     add.textContent = t('font.add'); add.style.fontSize = '12px';
@@ -836,12 +877,16 @@ function openPanel(text, init = {}){
         tipEl.textContent = t('font.notInstalledTip');
         return;
       }
-      st[key] = b.dataset.v; setCfg(key, st[key]); sync(); draw();
+      st[key] = b.dataset.v; setCfg(key, st[key]); ownIt('font'); sync(); draw();
     });
     pickFont(box, 'font'); pickFont(q('#latin'), 'latinFont'); pickFont(q('#swTitleFont'), 'titleFont');
   }
 
+  q('#bare').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ st.noGround = b.dataset.v === '1'; sync(); draw(); } });
   const sync = () => {
+    q('#bare').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.v === '1') === st.noGround));
+    mask.classList.toggle('bare', st.noGround);
+    pick.refresh();
     const marks = [['#orient', st.orient], ['#pagesRow', st.pages],
                    ['#paperBuiltin', st.paper], ['#paperPack', st.paper], ['#paperMine', st.paper],
                    ['#font', st.font], ['#ink', st.ink], ['#weight', st.weight], ['#theme', st.theme],
@@ -881,7 +926,7 @@ function openPanel(text, init = {}){
   mkSize('fontSize',  '#fs',  '#fsn', 12, 200, 20,  96);
   mkSize('titleSize', '#ts',  '#tsn', 12, 300, 20, 140);
   // 取色器：拖的时候就直接用上（st.ink 可以直接是个 #rrggbb，不必先存），存不存随意
-  q('#ck').oninput = e => { st.ink = e.target.value; setCfg('ink', st.ink); sync(); draw(); };
+  q('#ck').oninput = e => { st.ink = e.target.value; setCfg('ink', st.ink); ownIt('ink'); sync(); draw(); };
   q('#ckSave').onclick = () => {
     const c = q('#ck').value;
     const name = (q('#ckn').value || '').trim().slice(0, 24) || t('ink.defaultName', { n: (cfg('myInks') || []).length + 1 });
@@ -894,13 +939,34 @@ function openPanel(text, init = {}){
   };
   q('#il').oninput = e => { st.inkLight   = +e.target.value; setCfg('inkLight',   st.inkLight);   sync(); draw(); };
   q('#pl').oninput = e => { st.paperLight = +e.target.value; setCfg('paperLight', st.paperLight); sync(); draw(); };
-  q('#t').oninput = draw; q('#s').oninput = draw; q('#d').oninput = draw;
-  q('#hd').oninput = () => { setCfg('headText', q('#hd').value); draw(); };
-  q('#ti').oninput = draw;
+  const pick = mountPick({ mask, st, draw, alive, fillFonts });
+  q('#t').oninput  = e => { pick.edited('body', e); drawTyping(); };
+  q('#ti').oninput = e => { pick.edited('title', e); drawTyping(); };
+  q('#s').oninput = drawTyping; q('#d').oninput = drawTyping;
+  blindBar = mountBlind({ mask, st, draw, sync, alive, tip: m => { tipEl.textContent = m; },
+    openTab: v => { const b = q('#tabs button[data-v="' + v + '"]'); if (b.getAttribute('aria-pressed') !== 'true') b.click(); },
+    // 拖着的时候只重画第一张，不重建预览（重建的话手底下那层会被销毁，拖动当场断掉）
+    repaint: draft => {
+      plan = planPages(st); if (!plan.blind || !pageCanvases[0]) return null;
+      const post = plan.blind.B.post; if (draft) plan.blind.B.post = [];
+      clearTimeout(fineTimer); withDPR(1, () => renderPage(pageCanvases[0], st, plan, 0)); rough = true; fineTimer = setTimeout(settle, 1600); plan.blind.B.post = post;
+      return plan;
+    },
+    kept: { list: () => (cfg('presets') || []).filter(p => p.style && p.style.blind),
+            rename: (id, name) => { setCfg('presets', cfg('presets').map(x => (x.id === id ? { ...x, name } : x))); buildPresets(); },
+            remove: id => { setCfg('presets', cfg('presets').filter(x => x.id !== id)); buildPresets(); } },
+    keep: (name, blind) => {
+      const style = {}; for (const k of STYLE_KEYS) style[k] = st[k];
+      style.blind = blind;
+      setCfg('presets', (cfg('presets') || []).concat([{ id: 'ps' + Date.now(), name, style }]));
+      buildPresets();
+    } });
+  q('#hd').oninput = () => { setCfg('headText', q('#hd').value); drawTyping(); };
 
   const close = () => {
     // 自己的 Esc 监听无条件先摘：被新面板顶替后残留的那份也借这条路自清
     document.removeEventListener('keydown', esc);
+    pick.dispose();
     if (!alive()) return;
     if (vvStop) { vvStop(); vvStop = null; }
     mask.remove(); mask = null;
@@ -908,22 +974,28 @@ function openPanel(text, init = {}){
     if (typeof init.onClose === 'function') try { init.onClose(); } catch {}
   };
   q('#close').onclick = close;
-  mask.onclick = e => { if (e.target === mask) close(); };
-  const esc = e => { if (e.key === 'Escape') close(); };
+  // 🔴 按下也得在遮罩上才算「点了外面」。在内容框里拖选、手滑到面板外才松开，
+  //    浏览器会把这一下 click 算给遮罩 —— 面板当场关掉，写的字全没了。
+  let downOnMask = false;
+  mask.addEventListener('pointerdown', e => { downOnMask = e.target === mask; }, true);
+  mask.onclick = e => { if (e.target === mask && downOnMask) close(); };
+  // 正选着字的时候，Esc 先放开选中的字，再按一次才关面板
+  const esc = e => { if (e.key === 'Escape' && !(alive() && (pick.drop() || blindBar.drop()))) close(); };
   document.addEventListener('keydown', esc);
 
   // ── 存 / 复制 ───────────────────────────────────────────────────
   q('#save').onclick = async () => {
+    finish();
     const n = pageCanvases.length;
     const stamp = stampName();
     const sub = (cfg('subdir') || '').replace(/[\\/]+$/, '');
     let ok = 0, viaFallback = 0;
     tipEl.textContent = t('save.working', { n });
     for (let i = 0; i < n; i++){
-      const blob = await new Promise(r => pageCanvases[i].toBlob(r, 'image/jpeg', 0.94));
+      const blob = await new Promise(r => st.noGround ? pageCanvases[i].toBlob(r, 'image/png') : pageCanvases[i].toBlob(r, 'image/jpeg', 0.94));
       if (!blob) continue;
       const url = URL.createObjectURL(blob);
-      const base = n > 1 ? t('save.fileMulti', { stamp, i: i+1, n }) : t('save.fileOne', { stamp });
+      const base = (n > 1 ? t('save.fileMulti', { stamp, i: i+1, n }) : t('save.fileOne', { stamp })).replace(/\.jpe?g$/, st.noGround ? '.png' : '.jpg');
       const name = (sub ? sub + '/' : '') + base;
       const done = await new Promise(res => {
         try {
@@ -949,6 +1021,7 @@ function openPanel(text, init = {}){
   };
 
   q('#copy').onclick = () => {
+    finish();
     const cv = pageCanvases[selected]; if (!cv) return;
     cv.toBlob(async b => {
       try {

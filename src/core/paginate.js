@@ -4,24 +4,62 @@
 // ════════════════════════════════════════════════════════════════════
 // cross = 与流动方向垂直的那条边：横排时是版心宽，竖排时是版心高。
 // 两种排法都吐出同样形状的 items（一行 / 一列），所以下面的分页算法一字不用改。
-function buildItems(ctx, text, cross, fontSize, vertical){
-  const LH = Math.round(fontSize * 1.72), GAP = Math.round(fontSize * .62);
+//
+// rich ＝ 原文逐字的样式（spans.js 的 richOf），没有就是 null。
+function splitParas(text){
   // 空行＝分段（段间留空档）；单个换行＝硬换行（照断，不留空档）。
-  // 🔴 早先段内的单换行被 replace 抹掉了 —— 用户敲的回车在纸上凭空消失。
-  const paras = text.split(/\n{2,}/).map(s => s.replace(/[ \t]+\n/g, '\n').trim()).filter(Boolean);
+  // 每一行都记着自己在原文里的起点 at —— 局部样式按原文下标存，靠它对上号。
+  const paras = []; let from = 0;
+  for (const raw of text.split(/(\n{2,})/)){
+    let at = from; from += raw.length;
+    if (/^\n{2,}$/.test(raw)) continue;
+    const parts = raw.split('\n');
+    const lines = parts.map((s, i) => {
+      const ln = { at, text: i < parts.length - 1 ? s.replace(/[ \t]+$/, '') : s };
+      at += s.length + 1;
+      return ln;
+    });
+    // 整段首尾的空白去掉（连带首尾的空行）
+    while (lines.length && !lines[0].text.trim()) lines.shift();
+    while (lines.length && !lines[lines.length-1].text.trim()) lines.pop();
+    if (!lines.length) continue;
+    const head = lines[0], tail = lines[lines.length-1];
+    const t = head.text.trimStart(); head.at += head.text.length - t.length; head.text = t;
+    tail.text = tail.text.trimEnd();
+    paras.push(lines);
+  }
+  return paras;
+}
+
+function buildItems(ctx, text, cross, fontSize, vertical, rich){
+  const LH = Math.round(fontSize * 1.72), GAP = Math.round(fontSize * .62);
+  const font = ctx.font;
   const items = [];
-  paras.forEach((p, i) => {
+  // 🔴 早先段内的单换行被 replace 抹掉了 —— 用户敲的回车在纸上凭空消失。
+  splitParas(text).forEach((lines, i) => {
     if (i) items.push({ gap: true, h: GAP });
-    for (const hard of p.split('\n')){
+    for (const { text: hard, at } of lines){
       if (!hard.trim()){ items.push({ gap: true, h: LH }); continue; }   // 段内空行＝空一行
-      if (vertical){
-        for (const c of wrapVertical(hard, fontSize, cross, ctx)) items.push({ text: c, h: LH });
-      } else {
-        for (const ln of wrap(ctx, hard, cross)) items.push({ text: ln, h: LH });
-      }
+      items.push(...flowRows(ctx, hard, sliceRich(rich, at, at + hard.length),
+                             { size: fontSize, cross, vertical, lead: 1.72, font, from: at }));
     }
   });
   return { items, LH, GAP };
+}
+
+// 一段不含换行的字 → 若干行（或竖排的列）。正文和标题都走这里。
+// 行高跟着这一行里最大的字走：一行里有个大字，这一行就让出大字的高度，别的行不动。
+function flowRows(ctx, str, rich, { size, cross, vertical, lead, font, from = 0 }){
+  ctx.font = font;
+  const parts = vertical ? wrapVertical(str, size, cross, ctx, null, rich) : wrap(ctx, str, cross, 0, rich);
+  let at = 0;
+  return parts.map(text => {
+    const r = sliceRich(rich, at, at + text.length);
+    const row = { text, h: Math.round(maxSize(r, size) * lead), at: from + at };
+    at += text.length;
+    if (r) row.rich = r;
+    return row;
+  });
 }
 
 // 贪心装箱；forceN 时按「剩余高度 / 剩余页数」均摊，让几页看起来一样满

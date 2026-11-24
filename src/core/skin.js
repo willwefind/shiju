@@ -37,7 +37,10 @@ const SIZES = {
   portrait : { name:'竖版', w:1080, h:1350, pad:104 },
   landscape: { name:'横版', w:1350, h:1080, pad:110 },
 };
-const DPR = 2;
+let DPR = 2;
+// 预览的草样按一倍画，存图、复制之前一律补回两倍。效果里的像素量都按两倍写，缩到一倍时过 bPx
+const withDPR = (k, fn) => { const was = DPR; DPR = k; try { return fn(); } finally { DPR = was; } };
+const bPx = v => v * DPR / 2;
 
 // ── 配色：按对比度挑墨，不靠拍脑袋 ──────────────────────────────────
 const hex2rgb = h => [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)];
@@ -55,7 +58,7 @@ const STYLE_KEYS = ['paper','font','latinFont','fontSize','ink','metaInk','quote
                     'weight','titleFont','titleSize','titleWeight','inkLight','paperLight',
                     'align','titleAlign','vertical','offsetX','offsetY',
                     'headText','showHeader','showSource','showDate',
-                    'headRule','titleRule','footRule','sourcePrefix','titleVertical'];
+                    'headRule','titleRule','footRule','sourcePrefix','titleVertical','blind'];
 
 const BUILTIN_PRESETS = [
   { id:'p_zhai', name:'摘录', style:{ headText:'摘 录', showHeader:true, showSource:true, showDate:true,

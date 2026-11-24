@@ -28,10 +28,26 @@ export const ORDER = [
   'core/fonts.js',           // 字体登记表/探测/字体栈
   'core/papers.js',          // 纸：程序化生成/素材包（含 installPack）/代表色
   'core/typeset.js',         // 避头尾/引号变色/竖排
+  'core/spans.js',           // 局部样式：选中的字单独的字号/字体/颜色
   'core/paginate.js',        // 正文压流/分页装箱
   'core/layout.js',          // titleBlock/chrome/planPages —— 排版计划
   'core/render.js',          // renderPage —— 把一页画到 canvas
+  'core/blind-text.js',      // 版式盲盒：断句/挑主角/字体/配色
+  'core/blind-colors.js',    // 版式盲盒：配色（中国／和田三造／国际／现调）
+  'core/blind-fx.js',        // 版式盲盒：效果与景
+  'core/blind-items.js',     // 版式盲盒：物件（光/环/星/花/毛线）
+  'core/blind-post.js',      // 版式盲盒：修图（整张后期）与玻璃片
+  'core/blind-stage.js',     // 版式盲盒：台面（尺、格、摆字）
+  'core/blind-recipes.js',   // 版式盲盒：方案（一种就是一张排好的海报）
+  'core/blind-quiet.js',     // 版式盲盒：低声的那些
+  'core/blind-image.js',     // 版式盲盒：意象字（文字即图形）
+  'core/blind-more.js',      // 版式盲盒：有体温的那些
+  'core/blind-long.js',      // 版式盲盒：长文
+  'core/blind-looks.js',     // 版式盲盒：气氛（底、光、质地、修图）
+  'core/blind-plan.js',      // 版式盲盒：掷签、验收、落墨
   'studio/studio-i18n.js',   // Studio 界面语言（zh-CN/en 词典 + t()）
+  'studio/studio-pick.js',   // 选中即改：只改选中的那几个字
+  'studio/studio-blind.js',  // 版式盲盒的按钮条
   'studio/studio-shell.js',  // Shadow DOM 面板全部界面
   'adapters/selection.js',   // 选区监听/Alt+Q/三指轻点
   'adapters/sillytavern.js', // 酒馆扩展入口

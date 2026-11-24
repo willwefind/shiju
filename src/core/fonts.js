@@ -76,15 +76,20 @@ function cjkStack(id){
     for (const f of FONTS){ const hit = f.probes && f.probes.length && resolveFont(f); if (hit) return `"${hit}",${SYS}`; }
     return SYS;
   }
-  const custom = cfg('myFonts').find(f => f.id === id);
+  const custom = myFontList().find(f => f.id === id);
   if (custom) return `"${custom.id}",${SYS}`;
   const f = FONTS.find(f => f.id === id);
   const hit = f && resolveFont(f);
   return hit ? `"${hit}",${SYS}` : SYS;
 }
 // 从任何一张表里把「系统里真正叫什么」解出来：自装的 → 中文表 → 西文表
+// 自己装的字：存储里连着字体文件本身（一款好几兆）。挑字、排盲盒一次要问几十遍名字，
+// 每问一遍都把文件整个搬出来一趟 —— 卡就卡在这儿。名单单独记着，改了再重取。
+let fontList = null, fontListAt = 0;
+const dropFontList = () => { fontList = null; };
+const myFontList = () => { const now = Date.now(); if (!fontList || now - fontListAt > 4000){ fontList = (cfg('myFonts') || []).map(f => ({ id: f.id, name: f.name })); fontListAt = now; } return fontList; };
 function familyOf(id){
-  const custom = cfg('myFonts').find(f => f.id === id);
+  const custom = myFontList().find(f => f.id === id);
   if (custom) return custom.id;
   const f = FONTS.find(x => x.id === id); if (f) return resolveFont(f);
   const l = LATIN.find(x => x.id === id); if (l) return resolveFont(l);
@@ -92,9 +97,15 @@ function familyOf(id){
 }
 // 标题可以挑中文字，也可以挑英文字。挑了英文字时它管拉丁，汉字自动落回正文的中文字体。
 function titleStack(st){
-  if (!st.titleFont || st.titleFont === 'same') return fontStack(st.font, st.latinFont);
-  const hit = familyOf(st.titleFont);
-  return hit ? `"${hit}",${cjkStack(st.font)}` : fontStack(st.font, st.latinFont);
+  const body = fontStack(st.font, st.latinFont);
+  return (!st.titleFont || st.titleFont === 'same') ? body : pickStack(st.titleFont, st, body);
+}
+// 指名要某一款字（标题、局部样式）。认不出来 / 没装，就退回 fallback。
+// 点名的字排在最前：连西文也归它，不再让全局的西文字体插队。
+function pickStack(id, st, fallback){
+  if (id === 'sys') return SYS;
+  const hit = familyOf(id);
+  return hit ? `"${hit}",${cjkStack(st.font)}` : fallback;
 }
 
 // 西文字体拼在最前面。它没有的字形（汉字）浏览器会自动往后找，不用我们分流字符。
@@ -102,7 +113,7 @@ function fontStack(id, latinId){
   const base = cjkStack(id);
   const lid = latinId === undefined ? cfg('latinFont') : latinId;
   if (!lid || lid === 'none') return base;
-  const custom = cfg('myFonts').find(f => f.id === lid);
+  const custom = myFontList().find(f => f.id === lid);
   if (custom) return `"${custom.id}",${base}`;
   const l = LATIN.find(x => x.id === lid);
   const hit = l && resolveFont(l);
