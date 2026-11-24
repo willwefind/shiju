@@ -47,3 +47,12 @@ test('拼进成品后照常启动（i18n 碎片不破坏无头环境）', () => 
   const { S } = bootShiju();
   assert.equal(typeof S.planPages, 'function');
 });
+
+test('面板语言：嵌入方指定的 > 自己换过的 > 浏览器的', () => {
+  const run = (cfg, v) => new Function('cfg', 'v', src + '\nreturn resolveStudioLocale(panelLocale(v));')(() => cfg, v);
+  assert.equal(run('en', 'zh-CN'), 'zh-CN');
+  assert.equal(run('zh-CN', 'en'), 'en');
+  assert.equal(run('en', 'auto'), 'en');
+  assert.equal(run('zh-CN', undefined), 'zh-CN');
+  assert.ok(['zh-CN', 'en'].includes(run('auto', undefined)));
+});

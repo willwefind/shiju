@@ -100,10 +100,10 @@ const blindPaneHtml = () => `
     ${bAcc('add', `<div class="chips" id="bItems"></div><div id="bAdd"></div>`)}
   </div>`;
 
-function mountBlind({ mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab }){
+function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab }){
   const q = s => mask.querySelector(s);
   // 一个盒子 ＝ 它自己的一串改动；盒子之间前后翻，盒子里头一步一步撤
-  const boxes = []; let at = -1, plan = null, sel = null, name = '', short = '', label = '', lookNow = '';
+  const boxes = resume ? resume.boxes : []; let at = resume ? resume.at : -1, plan = null, sel = null, name = '', short = '', label = '', lookNow = '';
   const box = () => boxes[at];
   const texts = () => ({ text: q('#t').value, title: q('#ti').value });
   const apply = () => { sync(); draw(); };
@@ -144,7 +144,7 @@ function mountBlind({ mask, st, draw, repaint, sync, alive, tip, keep, kept, ope
   q('#bOff').onclick = () => { st.blind = null; sel = null; apply(); };
   q('#bEdit').onclick = () => openTab('box');
   // 常用版式：收下的时候把颜色也定死，以后换一段字、换一个版本，都还是它
-  let open = false;
+  let open = !!(resume && resume.open);
   q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, { ...st.blind, pal: { ...plan.blind.pal } }); open = true; fillKept(); tip(t('blind.kept', { name: n })); };
   function fillKept(){
     const list = kept.list(), box = q('#bKept'); box.textContent = ''; q('#bMine').hidden = !list.length; box.hidden = !list.length || !open;
@@ -389,6 +389,6 @@ function mountBlind({ mask, st, draw, repaint, sync, alive, tip, keep, kept, ope
   const editing = on => mask.classList.toggle('bedit', on);
   const drop = () => { if (!sel) return false; sel = null; refreshOne(); overlay(); return true; };
   refreshOne();
-  return { refresh, editing, drop, own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
+  return { refresh, editing, drop, state: () => ({ boxes, at, open }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
 }
 

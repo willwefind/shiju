@@ -57,6 +57,7 @@ const DEF = {
   inkLight: 0,          // 墨色明暗 −50…+50（正=往白走，负=往黑走）
   paperLight: 0,        // 纸张明暗 −50…+50
   theme: 'auto',        // 面板主题：auto 跟随系统 / day / night
+  uiLang: 'auto',       // 面板语言：auto 跟着浏览器 / zh-CN / en（面板右上角那颗按钮换）
   myInks: [],           // [{id,name,c}] 自己调的墨
   align: 'left',        // 正文对齐（在版心里，不是贴纸边）
   titleAlign: 'center',
@@ -4963,7 +4964,8 @@ function renderBlind(canvas, st, plan, idx){
 // 内容与内容默认值不在此列：题头默认「摘 录」、出处前缀「—— 」、提示句
 // TAGLINES 是**作品上的字**，不是界面文字，保持原样（已声明的取舍）。
 // 适配器注入：嵌入方开面板时传 init.locale（'zh-CN' | 'en' | 'auto'），
-// 用户脚本自己走 auto = 浏览器语言（zh-* → zh-CN，其余 → en）。
+// 用户脚本自己走 cfg('uiLang')：在面板上换过语言就听那个，没换过（auto）= 浏览器语言
+// （zh-* → zh-CN，其余 → en）。嵌入方指定了 zh-CN / en 的，听嵌入方的，面板上也不出切换按钮。
 //
 // 铁律（与阅读器 Phase 1 相同）：
 //   1. zh-CN 词典的值必须与清扫前的界面原文**逐字相同** —— 中文界面一个字都不变；
@@ -4976,6 +4978,7 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': '摘',
     'app.title': '拾 句',
+    'lang.toggle': '界面换成英文',
     'theme.auto': '跟随', 'theme.day': '白天', 'theme.night': '黑夜',
     'tab.text': '文', 'tab.paper': '纸', 'tab.font': '字', 'tab.ink': '色', 'tab.layout': '版',
     'act.save': '存 图', 'act.copy': '复制这张', 'act.close': '关闭',
@@ -5234,6 +5237,7 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': 'Clip',
     'app.title': 'Shiju',
+    'lang.toggle': 'Switch the interface to Chinese',
     'theme.auto': 'System', 'theme.day': 'Day', 'theme.night': 'Night',
     'tab.text': 'Text', 'tab.paper': 'Paper', 'tab.font': 'Type', 'tab.ink': 'Ink', 'tab.layout': 'Layout',
     'act.save': 'Save', 'act.copy': 'Copy this one', 'act.close': 'Close',
@@ -5500,6 +5504,9 @@ function resolveStudioLocale(v) {
 }
 let studioLocale = resolveStudioLocale('auto');
 function setStudioLocale(v) { studioLocale = resolveStudioLocale(v); }
+// 嵌入方指定的 > 自己在面板上换过的 > 浏览器的
+const hostLocale = v => v === 'zh-CN' || v === 'en';
+const panelLocale = v => (hostLocale(v) ? v : cfg('uiLang'));
 
 // 查词：当前语言 → zh-CN 兜底 → 键名本身（宁可露出键名也不静默空白）
 function t(key, params) {
@@ -5884,10 +5891,10 @@ const blindPaneHtml = () => `
     ${bAcc('add', `<div class="chips" id="bItems"></div><div id="bAdd"></div>`)}
   </div>`;
 
-function mountBlind({ mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab }){
+function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab }){
   const q = s => mask.querySelector(s);
   // 一个盒子 ＝ 它自己的一串改动；盒子之间前后翻，盒子里头一步一步撤
-  const boxes = []; let at = -1, plan = null, sel = null, name = '', short = '', label = '', lookNow = '';
+  const boxes = resume ? resume.boxes : []; let at = resume ? resume.at : -1, plan = null, sel = null, name = '', short = '', label = '', lookNow = '';
   const box = () => boxes[at];
   const texts = () => ({ text: q('#t').value, title: q('#ti').value });
   const apply = () => { sync(); draw(); };
@@ -5928,7 +5935,7 @@ function mountBlind({ mask, st, draw, repaint, sync, alive, tip, keep, kept, ope
   q('#bOff').onclick = () => { st.blind = null; sel = null; apply(); };
   q('#bEdit').onclick = () => openTab('box');
   // 常用版式：收下的时候把颜色也定死，以后换一段字、换一个版本，都还是它
-  let open = false;
+  let open = !!(resume && resume.open);
   q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, { ...st.blind, pal: { ...plan.blind.pal } }); open = true; fillKept(); tip(t('blind.kept', { name: n })); };
   function fillKept(){
     const list = kept.list(), box = q('#bKept'); box.textContent = ''; q('#bMine').hidden = !list.length; box.hidden = !list.length || !open;
@@ -6173,7 +6180,7 @@ function mountBlind({ mask, st, draw, repaint, sync, alive, tip, keep, kept, ope
   const editing = on => mask.classList.toggle('bedit', on);
   const drop = () => { if (!sel) return false; sel = null; refreshOne(); overlay(); return true; };
   refreshOne();
-  return { refresh, editing, drop, own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
+  return { refresh, editing, drop, state: () => ({ boxes, at, open }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -6339,6 +6346,7 @@ function showPill(x, y, text){
     pill.onmousedown = e => e.preventDefault();     // 别让点击清掉选区
     root.append(pill);
   }
+  setStudioLocale(panelLocale()); pill.textContent = t('pill.clip');      // 在面板上换过语言，这颗也跟着
   pill.style.left = Math.min(x, innerWidth - 70) + 'px';
   pill.style.top  = Math.max(8, y - 44) + 'px';
   pill.hidden = false;
@@ -6384,7 +6392,7 @@ const pickFiles = accept => new Promise(res => {
 // 不传 init 时行为与从前完全相同 —— 网页选中路径一个字都没变。
 function openPanel(text, init = {}){
   // 语言先落定再建面板：面板 HTML 是开面板时现拼的，t() 在拼的那一刻取词
-  setStudioLocale(init.locale || 'auto');
+  setStudioLocale(panelLocale(init.locale));
   // 嵌入方可为可再分发西文字体提供文件 URL（{latinId: url}）——选中才装载
   const embedFontUrls = (init.fontUrls && typeof init.fontUrls === 'object') ? init.fontUrls : {};
   ui();
@@ -6416,6 +6424,8 @@ function openPanel(text, init = {}){
     theme: cfg('theme'),
     showHeader: cfg('showHeader'), showSource: cfg('showSource'), showDate: cfg('showDate'),
   };
+  // 换语言：面板整个重拼一遍，手上的东西原样接过来
+  const back = init.resume; if (back) Object.assign(st, back.st);
   const prefersDark = () => { try { return matchMedia('(prefers-color-scheme: dark)').matches; } catch { return false; } };
   const applyTheme = () => {
     if (!alive()) return;      // 系统主题翻转可能发生在面板关掉之后
@@ -6431,7 +6441,7 @@ function openPanel(text, init = {}){
   mask.innerHTML = `
     <div class="box">
       <div class="side">
-        <h2>${t('app.title')}<span class="sw" id="theme" style="float:right">
+        <h2>${t('app.title')}<span class="sw" id="lang" style="float:right;margin-left:6px${hostLocale(init.locale) ? ';display:none' : ''}"><button title="${t('lang.toggle')}" aria-label="${t('lang.toggle')}">${studioLocale === 'en' ? '中' : 'EN'}</button></span><span class="sw" id="theme" style="float:right">
           <button data-v="auto">${t('theme.auto')}</button><button data-v="day">${t('theme.day')}</button><button data-v="night">${t('theme.night')}</button>
         </span></h2><p class="h" id="tag"></p>
 
@@ -6823,6 +6833,15 @@ function openPanel(text, init = {}){
     st.theme = b.dataset.v; setCfg('theme', st.theme); applyTheme(); sync();
   });
 
+  q('#lang').onclick = e => {
+    if (!e.target.closest('button')) return;
+    const { resume, ...rest } = init, tab = mask.querySelector('#tabs button[aria-pressed=true]');
+    Object.assign(st, { text: q('#t').value, title: q('#ti').value, source: q('#s').value, date: q('#d').value, headText: q('#hd').value, sourcePrefix: q('#sp').value });
+    setCfg('uiLang', studioLocale === 'en' ? 'zh-CN' : 'en');
+    document.removeEventListener('keydown', esc); pick.dispose(); clearTimeout(fineTimer); clearTimeout(typingTimer);
+    openPanel(st.text, { ...rest, resume: { st, tab: tab ? tab.dataset.v : 'text', blind: blindBar.state() } });
+  };
+
   const mkSwitch = (sel, key) => q(sel).addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     st[key] = b.dataset.v === '1'; setCfg(key, st[key]); sync(); draw();
@@ -7121,7 +7140,7 @@ function openPanel(text, init = {}){
   q('#t').oninput  = e => { pick.edited('body', e); drawTyping(); };
   q('#ti').oninput = e => { pick.edited('title', e); drawTyping(); };
   q('#s').oninput = drawTyping; q('#d').oninput = drawTyping;
-  blindBar = mountBlind({ mask, st, draw, sync, alive, tip: m => { tipEl.textContent = m; },
+  blindBar = mountBlind({ resume: back && back.blind, mask, st, draw, sync, alive, tip: m => { tipEl.textContent = m; },
     openTab: v => { const b = q('#tabs button[data-v="' + v + '"]'); if (b.getAttribute('aria-pressed') !== 'true') b.click(); },
     // 拖着的时候只重画第一张，不重建预览（重建的话手底下那层会被销毁，拖动当场断掉）
     repaint: draft => {
@@ -7212,8 +7231,10 @@ function openPanel(text, init = {}){
   applyTheme();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch {}
   q('#tabs').querySelector('button').click();      // 默认落在「文」这一屏
+  if (back && back.tab !== 'box') q(`#tabs button[data-v="${back.tab}"]`).click();
   buildPapers(); buildFonts(); buildInks(); buildPresets(); sync(); draw();
-  if (blank) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
+  if (back && back.tab === 'box' && st.blind) q('#tabs button[data-v="box"]').click();      // 「盒」那一屏要等盲盒画出来才有
+  if (blank && !back) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
   ensureCustomFonts().then(() => { if (!alive()) return; buildFonts(); sync(); draw(); });
   Promise.all(cfg('myPapers').map(p => new Promise(r => {
     const i = myPaper(p.id); i && !i.complete ? (i.onload = r, i.onerror = r) : r();

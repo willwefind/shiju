@@ -5,7 +5,8 @@
 // 内容与内容默认值不在此列：题头默认「摘 录」、出处前缀「—— 」、提示句
 // TAGLINES 是**作品上的字**，不是界面文字，保持原样（已声明的取舍）。
 // 适配器注入：嵌入方开面板时传 init.locale（'zh-CN' | 'en' | 'auto'），
-// 用户脚本自己走 auto = 浏览器语言（zh-* → zh-CN，其余 → en）。
+// 用户脚本自己走 cfg('uiLang')：在面板上换过语言就听那个，没换过（auto）= 浏览器语言
+// （zh-* → zh-CN，其余 → en）。嵌入方指定了 zh-CN / en 的，听嵌入方的，面板上也不出切换按钮。
 //
 // 铁律（与阅读器 Phase 1 相同）：
 //   1. zh-CN 词典的值必须与清扫前的界面原文**逐字相同** —— 中文界面一个字都不变；
@@ -18,6 +19,7 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': '摘',
     'app.title': '拾 句',
+    'lang.toggle': '界面换成英文',
     'theme.auto': '跟随', 'theme.day': '白天', 'theme.night': '黑夜',
     'tab.text': '文', 'tab.paper': '纸', 'tab.font': '字', 'tab.ink': '色', 'tab.layout': '版',
     'act.save': '存 图', 'act.copy': '复制这张', 'act.close': '关闭',
@@ -276,6 +278,7 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': 'Clip',
     'app.title': 'Shiju',
+    'lang.toggle': 'Switch the interface to Chinese',
     'theme.auto': 'System', 'theme.day': 'Day', 'theme.night': 'Night',
     'tab.text': 'Text', 'tab.paper': 'Paper', 'tab.font': 'Type', 'tab.ink': 'Ink', 'tab.layout': 'Layout',
     'act.save': 'Save', 'act.copy': 'Copy this one', 'act.close': 'Close',
@@ -542,6 +545,9 @@ function resolveStudioLocale(v) {
 }
 let studioLocale = resolveStudioLocale('auto');
 function setStudioLocale(v) { studioLocale = resolveStudioLocale(v); }
+// 嵌入方指定的 > 自己在面板上换过的 > 浏览器的
+const hostLocale = v => v === 'zh-CN' || v === 'en';
+const panelLocale = v => (hostLocale(v) ? v : cfg('uiLang'));
 
 // 查词：当前语言 → zh-CN 兜底 → 键名本身（宁可露出键名也不静默空白）
 function t(key, params) {
