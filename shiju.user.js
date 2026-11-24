@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.18.1
+// @version      0.18.2
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @license      AGPL-3.0
@@ -24,7 +24,7 @@
 /* eslint-disable no-undef */
 (function () {
 'use strict';
-const SHIJU_VERSION = '0.18.1';
+const SHIJU_VERSION = '0.18.2';
 
 // ════════════════════════════════════════════════════════════════════
 //  同一页只许有一份
@@ -314,6 +314,8 @@ const LATIN = [
 
 // 宽度对比法：document.fonts.check() 在 Chrome 上对不存在的字体也返回 true，不能用
 const probeCache = new Map();
+// 网页字体是边用边下的：没下完的时候量出来像「没装」。下完了就把「没装」的结论作废，重新认
+function dropFontProbes(){ for (const [k, v] of probeCache) if (!v) probeCache.delete(k); if (typeof bGlyphCache !== 'undefined') for (const [k, v] of bGlyphCache) if (!v) bGlyphCache.delete(k); }
 function hasFont(family){
   if (!family) return true;
   if (probeCache.has(family)) return probeCache.get(family);
@@ -1533,16 +1535,19 @@ const B_TYPE = {
   serif     : [['Huiwen-mincho', '', 6], ['KingHwaOldSong', '', 4], ['ChillHuoSong_F', '', 3], ['NanxiYoumosong', '', 2], ['Zhuque Fangsong (technical prev', '', 2], ['Noto Serif SC', '', 2], ['Noto Serif SC Medium', '', 2], ['Source Han Serif SC', '', 2], ['NanoOldSong-C', '', 1], ['Songti SC', '', 0], ['STSong', '', 0]],
 };
 const B_LATIN = ['georgia', 'garamond', 'constantia', 'palatino', 'baskerv', 'didot', 'fellEng', 'fellPica', 'elite'];
+// 同一款字，系统里装的、嵌入方捆的，登记的名字不一样（Huiwen-mincho / Huiwen Mincho / 汇文明朝体）。
+// 认得别名，不然阅读器里明明带着汇文明朝，盲盒也掷不到它
+const bReal = fam => { if (hasFont(fam)) return fam; const f = FONTS.find(x => x.probes.includes(fam)); return (f && resolveFont(f)) || null; };
 function bFace(cls, rnd, sample, lat = ''){
-  const mine = /[sS]erif/.test(cls) ? myFontList().map(f => [f.id, '', 2]) : [], roll = rnd(), left = B_TYPE[cls].concat(mine).filter(f => f[2] && hasFont(f[0])).map(f => ({ f, w: f[2] }));
+  const mine = /[sS]erif/.test(cls) ? myFontList().map(f => [f.id, '', 2]) : [], roll = rnd(), seen = new Set(), left = B_TYPE[cls].concat(mine).filter(f => f[2]).map(f => ({ f, w: f[2], real: bReal(f[0]) })).filter(q => q.real && !seen.has(q.real) && seen.add(q.real));
   let first = true;
   while (left.length){                                             // 先掷签再验字形，验不过再掷 —— 一次全验完要画几千个字
     const it = bWeighted(first ? () => roll : rnd, left); first = false;
-    if (bHasGlyphs(it.f[0], sample)) return { stack: `${lat}"${it.f[0]}",${SYS}`, w: it.f[1] || '' };
+    if (bHasGlyphs(it.real, sample)) return { stack: `${lat}"${it.real}",${SYS}`, w: it.f[1] || '', canon: it.f[0] };
     left.splice(left.indexOf(it), 1);
   }
-  for (const [fam, w, k] of B_TYPE[cls]) if (!k && hasFont(fam) && bHasGlyphs(fam, sample)) return { stack: `${lat}"${fam}",${SYS}`, w: w || '' };
-  return { stack: lat + SYS, w: '' };
+  for (const [fam, w, k] of B_TYPE[cls]) if (!k && hasFont(fam) && bHasGlyphs(fam, sample)) return { stack: `${lat}"${fam}",${SYS}`, w: w || '', canon: fam };
+  return { stack: lat + SYS, w: '', canon: '' };
 }
 // 垫在底下的淡字用干净的字形（它大过整张纸，毛边在那儿只显脏）。主角不许换：毛边就是要大到露出来
 const B_READ = ['Huiwen-mincho', 'KingHwaOldSong', 'Zhuque Fangsong (technical prev', 'Zhuque Fangsong (technical preview)', 'ChillHuoSong_F', 'ChillJinshuSong', 'NanxiYoumosong', 'Noto Serif SC', 'Noto Serif SC Medium', 'Noto Serif SC Light', 'Noto Sans SC', 'Noto Sans SC Light', 'Source Han Serif SC'];      // 当正文也站得住的
@@ -1557,15 +1562,15 @@ function bFonts(st, rnd, text, heroText, own){
   const latins = B_LATIN.map(id => familyOf(id)).filter(Boolean), lat = latins.length ? `"${latins[Math.floor(roll[4] * latins.length)]}",` : '';
   const pair = cls => {
     // 配对的规矩：要么同一款（或同一家的粗细），要么差得远；两款差不多的老宋放一块最难看
-    const serif = /[sS]erif/.test(cls), h = bFace(cls, seq(0), heroText, serif ? lat : ''), fam = (h.stack.match(/"([^"]+)",(?:"Songti|\$)/) || [])[1] || (h.stack.split(',').map(q => q.replace(/"/g, '')).find(q => B_READ.includes(q)) || ''), readable = B_READ.includes(fam);
-    const one = f => hasFont(f) && bHasGlyphs(f, text) ? { stack: `${serif ? lat : ''}"${f}",${SYS}`, w: '' } : null;
+    const serif = /[sS]erif/.test(cls), h = bFace(cls, seq(0), heroText, serif ? lat : ''), fam = h.canon, readable = B_READ.includes(fam);
+    const one = f => { const real = bReal(f); return real && bHasGlyphs(real, text) ? { stack: `${serif ? lat : ''}"${real}",${SYS}`, w: '' } : null; };
     let b = null;
     if (readable && roll[1] < .8) b = one(fam);
     else if (/Noto Serif SC/.test(h.stack)) b = one('Noto Serif SC');
     else if (/Noto Sans SC/.test(h.stack)) b = roll[1] < .62 ? one('Noto Sans SC') : null;
     if (!b) b = serif ? bFace('serif', seq(2), text, lat) : roll[1] < .6 ? bFace('sans', seq(2), text) : bFace('lightSerif', seq(2), text, lat);
     const m = roll[3] < .7 ? b : bFace('sans', () => 0, text);
-    return { cls, big: B_ROUGH.some(f => h.stack.includes('"' + f + '"')) ? bClean(heroText, cls === 'lightSerif' || cls === 'serif') : null, hero: h.stack, heroW: h.w, body: b.stack, bodyW: b.w, meta: m.stack, metaW: m.w || '' };
+    return { cls, canon: h.canon, big: B_ROUGH.includes(h.canon) ? bClean(heroText, cls === 'lightSerif' || cls === 'serif') : null, hero: h.stack, heroW: h.w, body: b.stack, bodyW: b.w, meta: m.stack, metaW: m.w || '' };
   };
   return { pair, ...pair('heavySans') };
 }
@@ -4624,7 +4629,7 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
       bRestrain(B);
       B.placeMeta(mode);
       // 老宋的笔画粗细不一：同一款字，有时候把它印重一点
-      if (c.warm){ const fw = B.P([0, 0, 1, 1, 2]); if (fw && /Huiwen|KingHwa|Chill|Nanxi/.test(B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero' && !l.body) for (const o of l.ops) if (o.k === 'g' && !o.cell && o.f === 'hero') o.fw = fw; }
+      if (c.warm){ const fw = B.P([0, 0, 1, 1, 2]); if (fw && /Huiwen|KingHwa|Chill|Nanxi/.test(B.fonts.canon || B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero' && !l.body) for (const o of l.ops) if (o.k === 'g' && !o.cell && o.f === 'hero') o.fw = fw; }
       // 大字压到小字的地方，小字反色再印一遍（只印在大字里头）
       B.layers.forEach((l, i) => { if (l.twin){ l.of = i - 1; l.tc = (l.ops[0] || {}).c; } });
       if (B.maskOps){ const i = B.layers.findIndex(l => l.role === 'meta'); if (i >= 0) B.layers.push({ role: 'meta', ops: [], fx: [], twin: true, of: i, tc: B.maskC, mask: { mode: 'in', ops: B.maskOps } }); }
@@ -4699,7 +4704,7 @@ function bInkAccent(pal){
 // 大字的颜色收一收：暗底上不许大金字；又大又艳又粗的，一张里头只留一样
 function bRestrain(B){
   // 仿宋细而尖，是小字的字：拉长、加粗、放到巨大就露怯，换成干净的宋体
-  if (/Zhuque|Fangsong|仿宋/.test(B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero') for (const o of l.ops) if (o.k === 'g' && o.f === 'hero' && !o.stack && (o.cell || o.s > 210 * B.u)){ o.stack = bClean(o.t, true); delete o.fw; }
+  if (/Zhuque|Fangsong|仿宋/.test(B.fonts.canon || B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero') for (const o of l.ops) if (o.k === 'g' && o.f === 'hero' && !o.stack && (o.cell || o.s > 210 * B.u)){ o.stack = bClean(o.t, true); delete o.fw; }
   const { pal } = B, gold = B.dark && bHueIn(bLch(pal.a)[2], 46, 108) && bLch(pal.a)[1] > .07;
   for (const l of B.layers) if (l.role === 'hero' && !l.twin && !l.mask && !l.onAccent){ const z = blindAvg(l); if (gold && z > 64 * B.u) for (const o of l.ops) if (o.c === pal.a) o.c = z > 150 * B.u ? pal.i : B.inkAccent; }
 }
@@ -4721,7 +4726,7 @@ function blindPickFx(B, rng, bl, c, look){
       else if (l.quiet || l.gentle || ['melt', 'chorus', 'contour', 'shutter'].includes(c.id)) fx = fx.map(f => B_FX_QUIET.includes(f) || (!l.quiet && l.gentle && ['cuts', 'slice', 'split', 'stitch', 'veil', 'blinds', 'bars', 'disc', 'torn', 'brush', 'scatter', 'scan', 'smear'].includes(f)) ? f : swap);
       if (l.avg < 110 * B.u) fx = fx.filter(f => !['veil', 'split', 'stitch', 'smear', 'slit', 'scatter'].includes(f));
       // 一次只动一两种对比。粗、艳、发光、甩影子一起上，就是促销
-      const col = (l.ops.find(o => o.k === 'g') || {}).c, ink = col === B.pal.i, heavy = !B.softHero || B.fonts.cls === 'oldSerif' || l.ops.some(o => o.fw) || /KingHwa|Nanxi|Zhaohua/.test(B.fonts.hero), big = l.avg > 78 * B.u; l.heavy = heavy; l.ghost = B.kin;
+      const col = (l.ops.find(o => o.k === 'g') || {}).c, ink = col === B.pal.i, heavy = !B.softHero || B.fonts.cls === 'oldSerif' || l.ops.some(o => o.fw) || /KingHwa|Nanxi|Zhaohua/.test(B.fonts.canon || B.fonts.hero), big = l.avg > 78 * B.u; l.heavy = heavy; l.ghost = B.kin;
       fx = fx.map(f => {
         if (c.long && !B_LONG_FX.includes(f)) return 'melt';
         if (f === 'wash' && (c.long || B.dark) && bHueGap(bLch(B.pal.a)[2], bAnchor(B.pal)) > 75) return 'focus';      // 一行字从白染到另一头的艳色，花
@@ -7236,6 +7241,8 @@ function openPanel(text, init = {}){
   if (back && back.tab === 'box' && st.blind) q('#tabs button[data-v="box"]').click();      // 「盒」那一屏要等盲盒画出来才有
   if (blank && !back) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
   ensureCustomFonts().then(() => { if (!alive()) return; buildFonts(); sync(); draw(); });
+  // 嵌入方捆的字（一款一二十兆）可能这会儿才下完：单子刷新；正拆着盲盒就不动那张脸
+  try { document.fonts.addEventListener('loadingdone', function again(){ if (!alive()){ document.fonts.removeEventListener('loadingdone', again); return; } const n = FONTS.filter(fontAvailable).length; dropFontProbes(); if (FONTS.filter(fontAvailable).length === n) return; buildFonts(); sync(); if (!st.blind) draw(); }); } catch {}
   Promise.all(cfg('myPapers').map(p => new Promise(r => {
     const i = myPaper(p.id); i && !i.complete ? (i.onload = r, i.onerror = r) : r();
   }))).then(draw);

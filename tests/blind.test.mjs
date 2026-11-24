@@ -245,3 +245,13 @@ test('每一样东西、每一种效果都有中英文名', async () => {
 test('普通版式不受影响：blind 为 null 时没有盲盒', () => {
   assert.ok(!S.planPages(st(TEXTS['短'], 0, { blind: null }), makeGauge).blind);
 });
+
+test('字体认别名：嵌入方捆的 Huiwen Mincho 也算汇文明朝', async () => {
+  const fs = await import('node:fs'), src = fs.readFileSync(new URL('../src/core/blind-text.js', import.meta.url), 'utf8');
+  const line = src.split(/\r?\n/).find(l => l.startsWith('const bReal ='));
+  const make = has => new Function('FONTS', 'hasFont', 'resolveFont', line + '\nreturn bReal;')(S.FONTS, has, f => (f.probes || []).find(has) || null);
+  assert.equal(make(f => f === 'Huiwen Mincho')('Huiwen-mincho'), 'Huiwen Mincho');
+  assert.equal(make(f => f === 'Zhuque Fangsong')('Zhuque Fangsong (technical prev'), 'Zhuque Fangsong');
+  assert.equal(make(f => f === 'Huiwen-mincho')('Huiwen-mincho'), 'Huiwen-mincho');
+  assert.equal(make(() => false)('Noto Serif SC'), null);
+});

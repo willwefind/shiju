@@ -153,16 +153,19 @@ const B_TYPE = {
   serif     : [['Huiwen-mincho', '', 6], ['KingHwaOldSong', '', 4], ['ChillHuoSong_F', '', 3], ['NanxiYoumosong', '', 2], ['Zhuque Fangsong (technical prev', '', 2], ['Noto Serif SC', '', 2], ['Noto Serif SC Medium', '', 2], ['Source Han Serif SC', '', 2], ['NanoOldSong-C', '', 1], ['Songti SC', '', 0], ['STSong', '', 0]],
 };
 const B_LATIN = ['georgia', 'garamond', 'constantia', 'palatino', 'baskerv', 'didot', 'fellEng', 'fellPica', 'elite'];
+// 同一款字，系统里装的、嵌入方捆的，登记的名字不一样（Huiwen-mincho / Huiwen Mincho / 汇文明朝体）。
+// 认得别名，不然阅读器里明明带着汇文明朝，盲盒也掷不到它
+const bReal = fam => { if (hasFont(fam)) return fam; const f = FONTS.find(x => x.probes.includes(fam)); return (f && resolveFont(f)) || null; };
 function bFace(cls, rnd, sample, lat = ''){
-  const mine = /[sS]erif/.test(cls) ? myFontList().map(f => [f.id, '', 2]) : [], roll = rnd(), left = B_TYPE[cls].concat(mine).filter(f => f[2] && hasFont(f[0])).map(f => ({ f, w: f[2] }));
+  const mine = /[sS]erif/.test(cls) ? myFontList().map(f => [f.id, '', 2]) : [], roll = rnd(), seen = new Set(), left = B_TYPE[cls].concat(mine).filter(f => f[2]).map(f => ({ f, w: f[2], real: bReal(f[0]) })).filter(q => q.real && !seen.has(q.real) && seen.add(q.real));
   let first = true;
   while (left.length){                                             // 先掷签再验字形，验不过再掷 —— 一次全验完要画几千个字
     const it = bWeighted(first ? () => roll : rnd, left); first = false;
-    if (bHasGlyphs(it.f[0], sample)) return { stack: `${lat}"${it.f[0]}",${SYS}`, w: it.f[1] || '' };
+    if (bHasGlyphs(it.real, sample)) return { stack: `${lat}"${it.real}",${SYS}`, w: it.f[1] || '', canon: it.f[0] };
     left.splice(left.indexOf(it), 1);
   }
-  for (const [fam, w, k] of B_TYPE[cls]) if (!k && hasFont(fam) && bHasGlyphs(fam, sample)) return { stack: `${lat}"${fam}",${SYS}`, w: w || '' };
-  return { stack: lat + SYS, w: '' };
+  for (const [fam, w, k] of B_TYPE[cls]) if (!k && hasFont(fam) && bHasGlyphs(fam, sample)) return { stack: `${lat}"${fam}",${SYS}`, w: w || '', canon: fam };
+  return { stack: lat + SYS, w: '', canon: '' };
 }
 // 垫在底下的淡字用干净的字形（它大过整张纸，毛边在那儿只显脏）。主角不许换：毛边就是要大到露出来
 const B_READ = ['Huiwen-mincho', 'KingHwaOldSong', 'Zhuque Fangsong (technical prev', 'Zhuque Fangsong (technical preview)', 'ChillHuoSong_F', 'ChillJinshuSong', 'NanxiYoumosong', 'Noto Serif SC', 'Noto Serif SC Medium', 'Noto Serif SC Light', 'Noto Sans SC', 'Noto Sans SC Light', 'Source Han Serif SC'];      // 当正文也站得住的
@@ -177,15 +180,15 @@ function bFonts(st, rnd, text, heroText, own){
   const latins = B_LATIN.map(id => familyOf(id)).filter(Boolean), lat = latins.length ? `"${latins[Math.floor(roll[4] * latins.length)]}",` : '';
   const pair = cls => {
     // 配对的规矩：要么同一款（或同一家的粗细），要么差得远；两款差不多的老宋放一块最难看
-    const serif = /[sS]erif/.test(cls), h = bFace(cls, seq(0), heroText, serif ? lat : ''), fam = (h.stack.match(/"([^"]+)",(?:"Songti|\$)/) || [])[1] || (h.stack.split(',').map(q => q.replace(/"/g, '')).find(q => B_READ.includes(q)) || ''), readable = B_READ.includes(fam);
-    const one = f => hasFont(f) && bHasGlyphs(f, text) ? { stack: `${serif ? lat : ''}"${f}",${SYS}`, w: '' } : null;
+    const serif = /[sS]erif/.test(cls), h = bFace(cls, seq(0), heroText, serif ? lat : ''), fam = h.canon, readable = B_READ.includes(fam);
+    const one = f => { const real = bReal(f); return real && bHasGlyphs(real, text) ? { stack: `${serif ? lat : ''}"${real}",${SYS}`, w: '' } : null; };
     let b = null;
     if (readable && roll[1] < .8) b = one(fam);
     else if (/Noto Serif SC/.test(h.stack)) b = one('Noto Serif SC');
     else if (/Noto Sans SC/.test(h.stack)) b = roll[1] < .62 ? one('Noto Sans SC') : null;
     if (!b) b = serif ? bFace('serif', seq(2), text, lat) : roll[1] < .6 ? bFace('sans', seq(2), text) : bFace('lightSerif', seq(2), text, lat);
     const m = roll[3] < .7 ? b : bFace('sans', () => 0, text);
-    return { cls, big: B_ROUGH.some(f => h.stack.includes('"' + f + '"')) ? bClean(heroText, cls === 'lightSerif' || cls === 'serif') : null, hero: h.stack, heroW: h.w, body: b.stack, bodyW: b.w, meta: m.stack, metaW: m.w || '' };
+    return { cls, canon: h.canon, big: B_ROUGH.includes(h.canon) ? bClean(heroText, cls === 'lightSerif' || cls === 'serif') : null, hero: h.stack, heroW: h.w, body: b.stack, bodyW: b.w, meta: m.stack, metaW: m.w || '' };
   };
   return { pair, ...pair('heavySans') };
 }

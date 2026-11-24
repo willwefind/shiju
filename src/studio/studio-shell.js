@@ -1051,6 +1051,8 @@ function openPanel(text, init = {}){
   if (back && back.tab === 'box' && st.blind) q('#tabs button[data-v="box"]').click();      // 「盒」那一屏要等盲盒画出来才有
   if (blank && !back) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
   ensureCustomFonts().then(() => { if (!alive()) return; buildFonts(); sync(); draw(); });
+  // 嵌入方捆的字（一款一二十兆）可能这会儿才下完：单子刷新；正拆着盲盒就不动那张脸
+  try { document.fonts.addEventListener('loadingdone', function again(){ if (!alive()){ document.fonts.removeEventListener('loadingdone', again); return; } const n = FONTS.filter(fontAvailable).length; dropFontProbes(); if (FONTS.filter(fontAvailable).length === n) return; buildFonts(); sync(); if (!st.blind) draw(); }); } catch {}
   Promise.all(cfg('myPapers').map(p => new Promise(r => {
     const i = myPaper(p.id); i && !i.complete ? (i.onload = r, i.onerror = r) : r();
   }))).then(draw);

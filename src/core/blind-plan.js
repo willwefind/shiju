@@ -110,7 +110,7 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
       bRestrain(B);
       B.placeMeta(mode);
       // 老宋的笔画粗细不一：同一款字，有时候把它印重一点
-      if (c.warm){ const fw = B.P([0, 0, 1, 1, 2]); if (fw && /Huiwen|KingHwa|Chill|Nanxi/.test(B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero' && !l.body) for (const o of l.ops) if (o.k === 'g' && !o.cell && o.f === 'hero') o.fw = fw; }
+      if (c.warm){ const fw = B.P([0, 0, 1, 1, 2]); if (fw && /Huiwen|KingHwa|Chill|Nanxi/.test(B.fonts.canon || B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero' && !l.body) for (const o of l.ops) if (o.k === 'g' && !o.cell && o.f === 'hero') o.fw = fw; }
       // 大字压到小字的地方，小字反色再印一遍（只印在大字里头）
       B.layers.forEach((l, i) => { if (l.twin){ l.of = i - 1; l.tc = (l.ops[0] || {}).c; } });
       if (B.maskOps){ const i = B.layers.findIndex(l => l.role === 'meta'); if (i >= 0) B.layers.push({ role: 'meta', ops: [], fx: [], twin: true, of: i, tc: B.maskC, mask: { mode: 'in', ops: B.maskOps } }); }
@@ -185,7 +185,7 @@ function bInkAccent(pal){
 // 大字的颜色收一收：暗底上不许大金字；又大又艳又粗的，一张里头只留一样
 function bRestrain(B){
   // 仿宋细而尖，是小字的字：拉长、加粗、放到巨大就露怯，换成干净的宋体
-  if (/Zhuque|Fangsong|仿宋/.test(B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero') for (const o of l.ops) if (o.k === 'g' && o.f === 'hero' && !o.stack && (o.cell || o.s > 210 * B.u)){ o.stack = bClean(o.t, true); delete o.fw; }
+  if (/Zhuque|Fangsong|仿宋/.test(B.fonts.canon || B.fonts.hero)) for (const l of B.layers) if (l.role === 'hero') for (const o of l.ops) if (o.k === 'g' && o.f === 'hero' && !o.stack && (o.cell || o.s > 210 * B.u)){ o.stack = bClean(o.t, true); delete o.fw; }
   const { pal } = B, gold = B.dark && bHueIn(bLch(pal.a)[2], 46, 108) && bLch(pal.a)[1] > .07;
   for (const l of B.layers) if (l.role === 'hero' && !l.twin && !l.mask && !l.onAccent){ const z = blindAvg(l); if (gold && z > 64 * B.u) for (const o of l.ops) if (o.c === pal.a) o.c = z > 150 * B.u ? pal.i : B.inkAccent; }
 }
@@ -207,7 +207,7 @@ function blindPickFx(B, rng, bl, c, look){
       else if (l.quiet || l.gentle || ['melt', 'chorus', 'contour', 'shutter'].includes(c.id)) fx = fx.map(f => B_FX_QUIET.includes(f) || (!l.quiet && l.gentle && ['cuts', 'slice', 'split', 'stitch', 'veil', 'blinds', 'bars', 'disc', 'torn', 'brush', 'scatter', 'scan', 'smear'].includes(f)) ? f : swap);
       if (l.avg < 110 * B.u) fx = fx.filter(f => !['veil', 'split', 'stitch', 'smear', 'slit', 'scatter'].includes(f));
       // 一次只动一两种对比。粗、艳、发光、甩影子一起上，就是促销
-      const col = (l.ops.find(o => o.k === 'g') || {}).c, ink = col === B.pal.i, heavy = !B.softHero || B.fonts.cls === 'oldSerif' || l.ops.some(o => o.fw) || /KingHwa|Nanxi|Zhaohua/.test(B.fonts.hero), big = l.avg > 78 * B.u; l.heavy = heavy; l.ghost = B.kin;
+      const col = (l.ops.find(o => o.k === 'g') || {}).c, ink = col === B.pal.i, heavy = !B.softHero || B.fonts.cls === 'oldSerif' || l.ops.some(o => o.fw) || /KingHwa|Nanxi|Zhaohua/.test(B.fonts.canon || B.fonts.hero), big = l.avg > 78 * B.u; l.heavy = heavy; l.ghost = B.kin;
       fx = fx.map(f => {
         if (c.long && !B_LONG_FX.includes(f)) return 'melt';
         if (f === 'wash' && (c.long || B.dark) && bHueGap(bLch(B.pal.a)[2], bAnchor(B.pal)) > 75) return 'focus';      // 一行字从白染到另一头的艳色，花

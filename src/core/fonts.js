@@ -57,6 +57,8 @@ const LATIN = [
 
 // 宽度对比法：document.fonts.check() 在 Chrome 上对不存在的字体也返回 true，不能用
 const probeCache = new Map();
+// 网页字体是边用边下的：没下完的时候量出来像「没装」。下完了就把「没装」的结论作废，重新认
+function dropFontProbes(){ for (const [k, v] of probeCache) if (!v) probeCache.delete(k); if (typeof bGlyphCache !== 'undefined') for (const [k, v] of bGlyphCache) if (!v) bGlyphCache.delete(k); }
 function hasFont(family){
   if (!family) return true;
   if (probeCache.has(family)) return probeCache.get(family);
