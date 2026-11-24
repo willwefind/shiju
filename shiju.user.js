@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         拾句 · 网页摘录成图
 // @namespace    https://github.com/willwefind/shiju
-// @version      0.18.0
+// @version      0.18.1
 // @description  在任意网页上选中一段文字，把它排成纸上的摘录，存到本地。可换纸换字、横竖版、多页拆分。
 // @author       willwefind & Ciel
 // @license      AGPL-3.0
@@ -24,7 +24,7 @@
 /* eslint-disable no-undef */
 (function () {
 'use strict';
-const SHIJU_VERSION = '0.18.0';
+const SHIJU_VERSION = '0.18.1';
 
 // ════════════════════════════════════════════════════════════════════
 //  同一页只许有一份
