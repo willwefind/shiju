@@ -59,7 +59,7 @@ test('面板语言：嵌入方指定的 > 自己换过的 > 浏览器的', () =>
 
 test('面板里写到的每个词，词典里都有；每一屏都有名字', () => {
   const d = dicts()['zh-CN'], dir = path.join(ROOT, 'src/studio'), miss = [];
-  for (const f of fs.readdirSync(dir)) for (const m of fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/\bt\('([\w.]+)'/g)) if (!m[1].endsWith('_') && !m[1].endsWith('.') && !(m[1] in d)) miss.push(f + ' ' + m[1]);
+  for (const f of fs.readdirSync(dir)) for (const m of fs.readFileSync(path.join(dir, f), 'utf8').matchAll(/\bt\('([\w.]+)'(?!\s*\+)/g)) if (!m[1].endsWith('_') && !m[1].endsWith('.') && !(m[1] in d)) miss.push(f + ' ' + m[1]);
   for (const k of ['text', 'paper', 'font', 'ink', 'layout', 'comp', 'look', 'pal', 'feel', 'add']) if (!d['tab.' + k]) miss.push('tab.' + k);
   for (const k of ['all', 'air', 'tex', 'lens', 'word', 'print']) if (!d['blind.k_' + k]) miss.push('k_' + k);
   assert.deepEqual(miss, []);
