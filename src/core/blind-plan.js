@@ -5,6 +5,9 @@
 //   seed 总种子；seeds ＝ 单独重掷过的那几样；comp/look/hero/word ＝ 拆出来就钉住的方案、气氛和主角 ——
 //   🔑 钉住是因为人会接着改：早先主角每次重算都重挑，选中几个字加个粗，整张就换了一张脸。
 //   own ＝ 这一个盒子里，纸 / 字 / 墨哪几样用自己的；pal/fx/post/items/move ＝ 人自己定过的。
+//   v ＝ 2：每个决定各有各的随机流（字数、题头日期一变，不会连累后头的决定）；老盒子没有 v，照老样子算。
+//   keep ＝「存为常用」时记下的：第几把试成的（turn）、版心和题头怎么摆（room）、哪一套字（face）。
+//   amt ＝ 效果 / 修图的浓度（0–1，不写就是 1）。
 // planBlind 只算「谁在哪」，不画一笔（量具用桩就能跑，测试靠它）；画都在 renderBlind。
 const B_FX_ORDER = ['misreg', 'wash', 'echo', 'ink', 'drift', 'dots', 'dither', 'scan', 'wear', 'sand', 'motes', 'scatter', 'smear', 'slit', 'cuts', 'slice', 'split', 'stitch', 'ripple', 'veil', 'blinds', 'trail', 'burst', 'haze', 'glow', 'melt', 'focus', 'bars', 'disc', 'torn', 'brush', 'petals', 'snow'];
 // 面板上：常用的几样露在外头，其余收在「更多」里。掷的时候一样都不用后者
@@ -55,7 +58,8 @@ function planBlind(st, mk){
   const word = bl.word && text.includes(bl.word) ? { t: bl.word } : word0;
   const fonts = bFonts(st, r('font'), text, (hero ? hero.t : '') + (word ? word.t : '') + text, own.font);
 
-  const go = (t, h, w, whole) => blindCompose(st, S, pal, fonts, mk, t, h, w, bl, whole, sd, look);
+  const kf = bl.keep && bl.keep.face, face0 = kf && !fonts.own && (!kf.canon || (bReal(kf.canon) && bHasGlyphs(bReal(kf.canon), (hero ? hero.t : '') + (word ? word.t : '') + text))) ? kf : null;
+  const go = (t, h, w, whole) => blindCompose(st, S, pal, fonts, mk, t, h, w, bl, whole, sd, look, face0);
   let got = go(text, hero, word, true), inner = null, innerSt = null;
   if (!got){
     // 太长了：第一张只放主角当封面，全文按平常的排法跟在后面，同一张底同一套色
@@ -75,8 +79,8 @@ function planBlind(st, mk){
                     name: { comp: got.comp, look: look.id, fx: got.fxNames, post: B.post, scene: [...new Set(B.items.map(i => i.id))] } } };
 }
 
-function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, look){
-  const info = blindContent(text, hero), draw = bRng(sd.comp).rnd, soft = bIsQuiet(pal);
+function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, look, face0){
+  const v2 = bl.v >= 2, info = blindContent(text, hero), draw = bRng(sd.comp).rnd, soft = bIsQuiet(pal);
   // 空气安静，方案也安静：底和说话的嗓门要是一回事
   const NL = info.N, long = NL >= 130, fit = c => (bFaces(c, look) ? 1 : .12) * (c.long ? (NL >= 150 ? 9 : NL >= 100 ? 2.4 : .7) : NL >= 150 ? (c.dup ? .12 : .45) : NL >= 100 && c.dup ? .6 : 1);
   const pool = BLIND_COMPS.map((c, i) => ({ c, i, w: fit(c) * c.w * (c.q ? (soft ? 1.3 : .8) * (look.q || 1) : c.warm ? look.warm || 1 : B_LOUD[c.id] ? (soft ? .5 : 1) * (look.loud || .8) : 1) }));
@@ -84,27 +88,32 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
   while (pool.length){
     const it = want || bWeighted(draw, pool), tries = want ? 10 : 3; want = null; pool.splice(pool.indexOf(it), 1);
     const c = it.c;
-    for (let k = 0; k < tries; k++){
+    // 存下来的版式：先照上回试成的那一把、上回的版心来；放不下（字多了、题头压住了）才另想办法
+    const kp = bl.keep && bl.comp === c.id ? bl.keep : null, plans = Array.from({ length: tries }, (_, k) => [k, null]);
+    if (kp) plans.unshift([kp.turn | 0, kp.room || null], [kp.turn | 0, null]);
+    for (const [k, room0] of plans){
       // 每种方案自己一条随机流：钉住它以后，前面掷过谁都不影响它长什么样
-      const rnd = bRng(bSub(sd.comp, 100 + it.i * 11 + k)).rnd;
+      const rnd = bRng(bSub(sd.comp, 100 + it.i * 11 + k)).rnd, own = j => v2 ? bRng(bSub(sd.comp, 9000 + it.i * 11 + k + j * 4096)).rnd : rnd;
       let face = fonts;
-      if (!fonts.own){ const cls = bFaces(c, look) || c.face || ['heavySans']; face = fonts.pair(cls[Math.floor(bRng(bSub(sd.font, 60 + it.i)).rnd() * cls.length)]); }
+      if (!fonts.own){ const cls = bFaces(c, look) || c.face || ['heavySans']; face = kp && face0 ? face0 : fonts.pair(cls[Math.floor(bRng(bSub(sd.font, 60 + it.i)).rnd() * cls.length)]); }
       const B = blindStage(st, S, rnd, pal, face, mk, c.long ? .08 : c.warm ? .074 : .056);
       Object.assign(B, info, { word, B0: null, look, kin: bKin(pal), inkAccent: bInkAccent(pal), softHero: !/^heavy/.test(face.cls || '') && !/Black|Heavy|900|DuanHei/.test(face.hero + face.heroW), paras: bParas(text, info.cjk), warm: !!c.warm, minBody: bl.post ? 0 : look.min || 0 });
       B.titleUsed = !!(hero && hero.title);
-      B.solo = B.N <= 12 && (!whole || B.N <= 8 || rnd() < .6);
+      if (v2) B.verseRnd = own(5);
+      B.solo = B.N <= 12 && (!whole || B.N <= 8 || own(1)() < .6);
       B.D = B.solo ? 40 : B.N;
       if (B.solo) B.hero = { t: B.core.map((u, i) => (i && u.sp ? ' ' : '') + u.t).join(''), units: B.core };
-      B.keyClause = B.clauses.find(q => hero && q.t === hero.t) || (B.clauses.length ? bWeighted(rnd, B.clauses.map(q => ({ q, w: q.n >= 2 && q.n <= 8 ? 3 : 1 }))).q : null);
+      B.keyClause = B.clauses.find(q => hero && q.t === hero.t) || (B.clauses.length ? bWeighted(own(2), B.clauses.map(q => ({ q, w: q.n >= 2 && q.n <= 8 ? 3 : 1 }))).q : null);
       const home = hero && !hero.title ? B.paras.find(p => hero.units[0].at >= p.at && hero.units[0].at < p.at + p.t.length) : null;
-      B.keyPara = home || (B.paras.length ? bWeighted(rnd, B.paras.map(p => ({ p, w: (p.quote ? 4 : 1) * (p.ask ? 2 : 1) * (p.i === B.paras.length - 1 ? 2 : 1) * (p.n > 60 ? .2 : 1) }))).p : null);
+      B.keyPara = home || (B.paras.length ? bWeighted(own(3), B.paras.map(p => ({ p, w: (p.quote ? 4 : 1) * (p.ask ? 2 : 1) * (p.i === B.paras.length - 1 ? 2 : 1) * (p.n > 60 ? .2 : 1) }))).p : null);
       const keys = new Set(B.keyClause ? B.keyClause.units.map(u => u.at) : []);
       if (B.keyClause && B.keyClause.n > B.N * .6) keys.clear();
       B.isKey = u => keys.has(u.at);
-      const mode = B.P(c.modes || (c.warm ? ['left', 'right', 'center', 'left', 'side', 'corners', 'corners'] : ['corners', 'corners', 'corners', 'top', 'foot', 'side'])), room = B.metaRoom(mode);
-      B.A = { x: B.M, y: room.t, w: B.W - B.M * 2, h: B.H - room.t - room.b };
+      const mode = room0 ? room0.mode : bP(own(4), c.modes || (c.warm ? ['left', 'right', 'center', 'left', 'side', 'corners', 'corners'] : ['corners', 'corners', 'corners', 'top', 'foot', 'side'])), room = B.metaRoom(mode);
+      B.A = room0 && room0.W === B.W ? { ...room0.A } : { x: B.M, y: room.t, w: B.W - B.M * 2, h: B.H - room.t - room.b };
       // 字幕：上下要裁掉两条黑边，字先让开
-      if (bl.post ? bl.post.includes('subtitle') : look.id === 'subtitle'){ const cut = B.H * .115; B.A.y = Math.max(B.A.y, cut); B.A.h = B.H - B.A.y - Math.max(cut, room.b); }
+      if (!(room0 && room0.W === B.W) && (bl.post ? bl.post.includes('subtitle') : look.id === 'subtitle')){ const cut = B.H * .115; B.A.y = Math.max(B.A.y, cut); B.A.h = B.H - B.A.y - Math.max(cut, room.b); }
+      const A0 = { ...B.A };
       if (!c.ok(B)) break;
       if (!c.run(B)) continue;
       bRestrain(B);
@@ -117,7 +126,7 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
       for (const l of B.layers){ l.rect = blindRect(B, l); l.avg = blindAvg(l); }
       if (!blindFits(B)) continue;
       if (whole && !blindKeepsAll(B)) continue;
-      blindUnder(B, bRng(bSub(sd.comp, 77 + it.i)), c, bl);
+      blindUnder(B, bRng(bSub(sd.comp, 77 + it.i)), c, v2 ? bRng(bSub(sd.comp, 1177 + it.i)) : null);
       blindMoves(B, bl.move);
       blindStyle(B, st);
       for (const l of B.layers) if (l.twin) { l.ops = B.layers[l.of].ops.map(o => ({ ...o, c: o.styled ? o.c : l.tc, rich: undefined })); l.rect = B.layers[l.of].rect; l.avg = B.layers[l.of].avg; }
@@ -127,7 +136,7 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
       B.hit = (px, py, rr) => boxes.some(q => px > q.x - rr && px < q.x + q.w + rr && py > q.y - rr && py < q.y + q.h + rr);
       const fxNames = blindPickFx(B, bRng(sd.fx), bl, c, look);
       // 🔒 图形和线条一件都不掷，人想要自己添。例外只有玻璃那几片 —— 它们是「局部模糊」，不是图形
-      const rp = bRng(sd.post);
+      const rp = v2 ? bRng(bSub(sd.post, 31)) : bRng(sd.post);
       B.items = bl.items || [];
       if (!bl.items && look.pane && rp.rnd() < look.paneP * (long || c.long ? .3 : 1)){
         const id = rp.P(look.pane), it = blindNewItem(id, bSub(sd.post, 9), pal, S.w, S.h), h = B.heroRect || { x: B.A.x, y: B.A.y, w: B.A.w, h: B.A.h };
@@ -140,11 +149,11 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
         }
         if (best.hide < .4){ Object.assign(it, { x: Math.round(best.a.x), y: Math.round(best.a.y), r: Math.round(best.r), rot: 0, front: true }); if (id !== 'blurp') it.q = best.k; B.items = [it]; }
       }
-      let ps = bl.post || rp.P(look.post); const still = long || c.long;
+      const rq = v2 ? bRng(sd.post) : rp; let ps = bl.post || rq.P(look.post); const still = long || c.long;
       // 长文滤掉那些糊字的修图之后，别落得光秃秃的：补一层轻的空气
-      if (!bl.post && still && look.id !== 'flat' && !ps.some(q => B_LONG_POST.includes(q)) && rp.rnd() < .55) ps = [rp.P(['soft', 'soft', 'film', 'matte', 'multiply'])];
-      B.post = B_POST_ORDER.filter(q => ps.includes(q) && (bl.post || !(long || c.long) || B_LONG_POST.includes(q)));
-      return { B, comp: c.id, fxNames };
+      if (!bl.post && still && look.id !== 'flat' && !ps.some(q => B_LONG_POST.includes(q)) && rq.rnd() < .55) ps = [rq.P(['soft', 'soft', 'film', 'matte', 'multiply'])];
+      B.post = B_POST_ORDER.filter(q => ps.includes(q) && (bl.post || !c.calm || c.calm.includes(q)) && (bl.post || !(long || c.long) || B_LONG_POST.includes(q)));
+      return { B, comp: c.id, fxNames, turn: k, room: { mode, A: A0, W: B.W } };
     }
   }
   return null;
@@ -155,10 +164,11 @@ const bP = (rnd, arr) => arr[Math.floor(rnd() * arr.length)];
 const B_FULL = Object.fromEntries(['block', 'vblock', 'pack', 'field', 'micro', 'mosaic', 'contour', 'shift', 'image', 'youme', 'void', 'drift', 'ear', 'underlay', 'canon', 'ramp', 'rain', 'giant', 'overprint', 'panel', 'half', 'slit', 'depth', 'frame'].map(k => [k, 1]));
 const B_LOUD = Object.fromEntries(['block', 'vblock', 'pack', 'skyline', 'ramp', 'contour', 'overprint', 'cut', 'shutter', 'slit', 'micro', 'giant', 'grainy', 'shift', 'half', 'mosaic', 'tilt'].map(k => [k, 1]));
 // 垫底的淡字和边注：都是从正文里来的回声（没有 at，不算正文）
-function blindUnder(B, rng, c, bl){
+function blindUnder(B, rng, c, rng2){
   const { R, P, maybe } = rng, { W, H, A, M, pal, u, look } = B, heavy = /Black|Heavy|900/.test(B.fonts.hero + B.fonts.heroW), busy = B.layers.some(l => l.role === 'deco' && l.ops.some(o => o.k === 'g') || l.role === 'back');
   const key = B.hero ? B.hero.units : B.keyClause ? B.keyClause.units : B.core.slice(0, 4), ghost = key.map(q => ({ ...q, at: undefined }));
-  if (!B_FULL[c.id] && !busy && B.cjk && maybe((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1))){
+  const p0 = v => (rng2 ? (x => () => x)(maybe(v)) : () => maybe(v)), want = p0((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1));
+  if (!B_FULL[c.id] && !busy && B.cjk && want((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1))){
     const blur = maybe(.6) ? (look.ghost === undefined ? 5 : look.ghost) * R(.6, 1.6) * u : 0, col = P([pal.i, pal.i, B.kin]), al = (heavy ? R(.045, .08) : R(.07, .13)) * (blur > 4 ? 1.5 : 1) * (B.dark ? 1.15 : 1), l = B.layer('deco', { bleed: true, under: true, ...(blur ? { soft: blur } : {}) }), kind = P(['char', 'char', 'col', 'row', 'verse']);
     const body = B.layers.filter(q => q.role === 'body' || q.body).flatMap(q => q.ops.map(o => blindOpRect(B, o))).filter(Boolean), left = body.length ? body.reduce((s, r) => s + r.x + r.w / 2, 0) / body.length < W / 2 : maybe(.5);
     if (kind === 'char'){ const ch = bDense(B.word ? B.word.t : '') || bDense(ghost.map(g => g.latin ? '' : g.t).join('')) || ghost[0].t, s = W * R(.8, 1.35); B.glyph(l, ch, W * (left ? R(.58, .82) : R(.18, .42)), H * R(.3, .72), s, { c: col, a: al, ...(B.fonts.big ? { stack: B.fonts.big } : {}) }); }
@@ -167,6 +177,10 @@ function blindUnder(B, rng, c, bl){
     else { const s = Math.min(W * .9 / B.emOf(ghost), H * .1), n = Math.ceil(H / (s * 1.16)), dx = R(-.5, .5) * s; for (let i = -1; i <= n; i++) B.row(l, ghost, W / 2 + dx * (i - n / 2), s * 1.16 * (i + .5), s, { c: col, a: al * (.45 + .55 * Math.abs(Math.sin(i * .7 + 1))) }); }
   }
   // 没写题头出处日期的，边上也别空得像没做完：拿正文里的词当边注，很小
+  if (rng2) blindNote(B, rng2, key); else blindNote(B, rng, key);
+}
+function blindNote(B, { R, P, maybe }, key){
+  const { W, H, M, pal, u } = B;
   if (!B.metaItems().length && B.cjk && B.N > 8 && maybe(.55)){
     const z = R(14, 18) * u, l = B.layer('deco', { note: true }), soft = { c: pal.i, a: .72, f: 'meta' }, first = B.clauses[0], last = B.clauses[B.clauses.length - 1], cut = (us, n, end) => (end ? us.slice(-n) : us.slice(0, n)).map(q => ({ ...q, at: undefined })), y0 = M * .52, y1 = H - M * .52, gap = R(.1, .6), kind = P(['corner', 'corner', 'side', 'one', 'four']);
     const put = (us, x, y, align) => B.row(l, us, x, y, z, { align, gap, ...soft });
@@ -392,10 +406,25 @@ function blindGrain(){
   return (bGrainTile = c);
 }
 
+// 调浓淡：做过效果的和没做的按比例掺。两张都带透明，所以用相加，不用一张盖一张
+function bLerp(after, before, k){
+  const c = bCanvas(after.width, after.height), x = c.getContext('2d');
+  x.globalAlpha = k; x.drawImage(after, 0, 0); x.globalCompositeOperation = 'lighter'; x.globalAlpha = 1 - k; x.drawImage(before, 0, 0);
+  x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; return c;
+}
+const B_POST_WHOLE = ['negate', 'subtitle'];      // 反色掺一半就是一张灰，字幕要么有要么没有：这两样不分浓淡
+// 读的字里最小的有多大（按 1080 宽算）：磨砂看它收着点
+const blindSmall = B => Math.min(999, ...B.layers.filter(l => l.role === 'body' || l.body).flatMap(l => l.ops.filter(o => o.k !== 'r' && o.s).map(o => o.cell ? Math.min(...o.cell) : o.s))) / B.u;
+// 只问这颗种子的气氛，不排版（重掷的时候先看一眼，一样就不必排）
+function blindAir(st, bl){
+  const own = bl.own || {}, sd = blindSeeds(bl), r = k => bRng(sd[k]).rnd;
+  return bLook(bl.pal ? { ...bl.pal, m: relLum(hex2rgb(bl.pal.g)) < .3 ? 'night' : 'clear' } : bPalette(st, r('pal'), own), r('look'), bl.look).id;
+}
+
 function renderBlind(canvas, st, plan, idx){
   const { blind, W, H } = plan;
   if (idx > 0) return renderPage(canvas, blind.innerSt, blind.inner, idx - 1);
-  const { B, pal, sd } = blind, ctx = canvas.getContext('2d'), cache = new Map();
+  const { B, pal, sd } = blind, ctx = canvas.getContext('2d'), cache = new Map(), amt = { fx: 1, post: 1, ...((st.blind || {}).amt || {}) };
   if (canvas.width !== W * DPR || canvas.height !== H * DPR){ canvas.width = W * DPR; canvas.height = H * DPR; }      // 尺寸没变就别重新要一块
   else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, canvas.width, canvas.height); }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -427,7 +456,9 @@ function renderBlind(canvas, st, plan, idx){
       for (let k = -1; k * p < (vert ? W : H) + p; k++){ const a = (k + (inv ? 0 : duty)) * p * DPR, n = p * (inv ? duty : 1 - duty) * DPR; vert ? z.fillRect(a, 0, n, H * DPR) : z.fillRect(0, a, W * DPR, n); }
       z.globalCompositeOperation = 'source-over';
     }
-    l.fx.forEach((f, k) => { const out = BLIND_FX[f](cv, env(i * 16 + k), l); if (out !== cv){ bFree(cv); cv = out; } });
+    const kf = l.own ? 1 : amt.fx, plain = kf < 1 && l.fx.length ? bCopy(cv) : null;
+    if (kf > 0) l.fx.forEach((f, k) => { const out = BLIND_FX[f](cv, env(i * 16 + k), l); if (out !== cv){ bFree(cv); cv = out; } });
+    if (plain){ if (kf > 0){ const q = bLerp(cv, plain, kf); bFree(cv); cv = q; } bFree(plain); }
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(cv, 0, 0); bFree(cv);
     ctx.restore();
   });
@@ -438,7 +469,12 @@ function renderBlind(canvas, st, plan, idx){
   ctx.fillStyle = ctx.createPattern(blindGrain(), 'repeat'); ctx.fillRect(0, 0, W * 2, H * 2); ctx.restore(); }
   // 修图：整张排好了再过一遍
   // （透明底时，会整张铺颜色的那几种就不过了）
-  B.post.filter(p => !B.bare || ['gauss', 'defocus', 'swirl', 'matte', 'reeded'].includes(p)).forEach(p => BLIND_POST[p](canvas, { ...env(700 + B_POST_ORDER.indexOf(p)), full: B.layers.some(l => l.role === 'hero' && l.read), fonts: B.fonts, subtitle: B.hero ? B.hero.t : '' }));
+  B.post.filter(p => !B.bare || ['gauss', 'defocus', 'swirl', 'matte', 'reeded'].includes(p)).forEach(p => {
+    const k = B_POST_WHOLE.includes(p) ? 1 : amt.post; if (k <= 0) return;
+    const was = k < 1 && p !== 'matte' ? bCopy(canvas) : null;
+    BLIND_POST[p](canvas, { ...env(700 + B_POST_ORDER.indexOf(p)), full: B.layers.some(l => l.role === 'hero' && l.read), fonts: B.fonts, subtitle: B.hero ? B.hero.t : '', k, small: blindSmall(B) });
+    if (was){ const q = bLerp(canvas, was, k), y = canvas.getContext('2d'); y.setTransform(1, 0, 0, 1, 0, 0); y.globalAlpha = 1; y.globalCompositeOperation = 'copy'; y.drawImage(q, 0, 0); y.globalCompositeOperation = 'source-over'; bFree(q); bFree(was); }
+  });
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.textAlign = 'start'; ctx.textBaseline = 'top';
   if (DPR > 1) bDrain();                // 草样用的小画布留着下一张接着用
 }

@@ -126,7 +126,12 @@ const loadedCustom = new Set();
 async function ensureCustomFonts(){
   for (const f of cfg('myFonts')){
     if (loadedCustom.has(f.id)) continue;
-    try { const face = new FontFace(f.id, `url(${f.data})`); await face.load(); document.fonts.add(face); loadedCustom.add(f.id); }
+    try {
+      if (f.faces){ loadedCustom.add(f.id); await fontPieces(f, FONT_PROBE + f.name, false).catch(() => {}); continue; }      // 只记了链接的：先拿存过的几片，用到别的字再取
+      let src = `url(${f.data})`;
+      if (!f.data){ src = await fontGet(f.id); if (!src) continue; }      // 存在别的网站的那份，这儿没有
+      const face = new FontFace(f.id, src); await face.load(); document.fonts.add(face); loadedCustom.add(f.id);
+    }
     catch (e){ console.warn('[拾句] 装不上字体', f.name, e.message); }
   }
 }

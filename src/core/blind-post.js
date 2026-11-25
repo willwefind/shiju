@@ -10,7 +10,9 @@ const bFull = (cv, fn) => { const x = cv.getContext('2d'), k = fn.length > 1 ? D
 // 缩到 w×h 上逐像素改，再放回来
 function bPixels(cv, scale, fn, smooth = true){
   const w = Math.max(2, Math.round(cv.width * scale)), h = Math.max(2, Math.round(cv.height * scale)), c = PLATFORM.canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
-  x.imageSmoothingQuality = 'high'; x.drawImage(cv, 0, 0, w, h);
+  x.imageSmoothingQuality = 'high';
+  if (scale < .95){ const g = PLATFORM.canvas(w, h), y = g.getContext('2d'); y.imageSmoothingQuality = 'high'; y.drawImage(cv, 0, 0, w, h); x.drawImage(g, 0, 0); }      // 先在显卡上缩小，再读回来：读回来的少一大半
+  else x.drawImage(cv, 0, 0, w, h);
   const im = x.getImageData(0, 0, w, h); const out = fn(im, w, h) || im; x.putImageData(out, 0, 0);
   bFull(cv, (y, W, H) => { y.imageSmoothingEnabled = smooth; y.imageSmoothingQuality = 'high'; y.drawImage(c, 0, 0, W, H); });
 }
@@ -128,11 +130,11 @@ const BLIND_POST = {
   },
   // 磨砂：像隔着一层砂面看
   matte(cv, E){
-    const seed = (E.rnd() * 4294967295) >>> 0, amp = E.R(1.2, 2.2) * E.u * (DPR > 1 ? 1 : .8);
-    bPixels(cv, DPR > 1 ? .62 : 1, (im, w, h) => {
+    const seed = (E.rnd() * 4294967295) >>> 0, amp = E.R(1.2, 2.2) * E.u * (DPR > 1 ? 1 : .56) * (E.k === undefined ? 1 : E.k) * Math.max(.5, Math.min(1, (E.small || 99) / 42));      // 砂子的质感照旧，字小就少抖一点
+    bPixels(cv, DPR > 1 ? .62 : .7, (im, w, h) => {
       const s = im.data, out = new ImageData(w, h), d = out.data, src = new Uint32Array(s.buffer), dst = new Uint32Array(d.buffer), r = mulberry32(seed), k = amp * 2;
       for (let y = 0, i = 0; y < h; y++) for (let x = 0; x < w; x++, i++){
-        const q = r(), xx = x + ((q * k * 2 - k) | 0), yy = y + ((q * 997 % 1 * k * 2 - k) | 0);
+        const q = r(), f = q * 997, xx = x + ((q * k * 2 - k) | 0), yy = y + (((f - (f | 0)) * k * 2 - k) | 0);      // 取小数别用 % 1，那个慢十倍
         dst[i] = src[(yy < 0 ? 0 : yy >= h ? h - 1 : yy) * w + (xx < 0 ? 0 : xx >= w ? w - 1 : xx)];
       }
       return out;
@@ -141,9 +143,9 @@ const BLIND_POST = {
   },
   // 油画：Kuwahara —— 每一点看四个角，取最匀的那个角的颜色，边就变成了笔触
   oil(cv, E){
-    const fine = DPR > 1, R0 = Math.max(2, Math.round(E.R(2, 3.7) * E.u * (fine ? 1 : .72)));
-    bPixels(cv, fine ? .5 : .72, (im, w, h) => {
-      const s = im.data, W1 = w + 1, N = W1 * (h + 1), sr = new Float64Array(N), sg = new Float64Array(N), sb = new Float64Array(N), sl = new Float64Array(N);
+    const fine = DPR > 1, R0 = Math.max(fine ? 2 : 1, Math.round(E.R(2, 3.7) * E.u * (fine ? 1 : .5)));
+    bPixels(cv, fine ? .5 : .5, (im, w, h) => {
+      const s = im.data, W1 = w + 1, N = W1 * (h + 1), sr = new Uint32Array(N), sg = new Uint32Array(N), sb = new Uint32Array(N), sl = new Float64Array(N);
       for (let y = 0; y < h; y++){ let a = 0, b = 0, c = 0, l2 = 0; for (let x = 0; x < w; x++){ const i = (y * w + x) * 4, r = s[i], g = s[i + 1], q = s[i + 2], l = r * .3 + g * .59 + q * .11; a += r; b += g; c += q; l2 += l * l; const o = (y + 1) * W1 + x + 1, p = y * W1 + x + 1; sr[o] = sr[p] + a; sg[o] = sg[p] + b; sb[o] = sb[p] + c; sl[o] = sl[p] + l2; } }
       const out = new ImageData(w, h), d = out.data;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){

@@ -45,10 +45,12 @@ export const ORDER = [
   'core/blind-long.js',      // 版式盲盒：长文
   'core/blind-looks.js',     // 版式盲盒：气氛（底、光、质地、修图）
   'core/blind-plan.js',      // 版式盲盒：掷签、验收、落墨
+  'core/blind-style.js',     // 版式盲盒：日本 / 国际现代主义 / 波普
   'studio/studio-i18n.js',   // Studio 界面语言（zh-CN/en 词典 + t()）
   'studio/studio-pick.js',   // 选中即改：只改选中的那几个字
   'studio/studio-blind.js',  // 版式盲盒的按钮条
   'studio/studio-full.js',   // 全屏
+  'studio/studio-fonts.js',  // 自己加字：文件 / 字体包 / 链接
   'studio/studio-shell.js',  // Shadow DOM 面板全部界面
   'adapters/selection.js',   // 选区监听/Alt+Q/三指轻点
   'adapters/sillytavern.js', // 酒馆扩展入口

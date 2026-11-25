@@ -45,10 +45,12 @@ export const VENDOR_ORDER = [
   'core/blind-long.js',
   'core/blind-looks.js',
   'core/blind-plan.js',
+  'core/blind-style.js',
   'studio/studio-i18n.js',
   'studio/studio-pick.js',
   'studio/studio-blind.js',
   'studio/studio-full.js',
+  'studio/studio-fonts.js',
   'studio/studio-shell.js',
 ];
 

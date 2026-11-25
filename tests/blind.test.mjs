@@ -255,3 +255,35 @@ test('字体认别名：嵌入方捆的 Huiwen Mincho 也算汇文明朝', async
   assert.equal(make(f => f === 'Huiwen-mincho')('Huiwen-mincho'), 'Huiwen-mincho');
   assert.equal(make(() => false)('Noto Serif SC'), null);
 });
+
+const base = () => ({ ...FIXTURES[0].st, title: '', spans: [], titleSpans: [] });
+test('三路新方案：排得出来，一个字不丢，序号只往后加', () => {
+  const T = { m: '灯下翻旧账，纸页有些返潮。有人说：「字要一笔一笔写，路要一步一步走。」窗外的雨停了又下，下了又停。', s: '我把灯留着，等雪停。你若回来，不必敲门。' }, seen = new Set();
+  for (const c of S.BLIND_STYLE) for (const k of ['s', 'm']) for (let seed = 1; seed <= 12; seed++){
+    const p = S.planPages({ ...base(), text: T[k], blind: { v: 2, seed: seed * 977, comp: c.id } }, makeGauge); if (!p.blind || p.blind.comp !== c.id) continue;
+    seen.add(c.id); const have = new Map();
+    for (const l of p.blind.B.layers) if (!l.twin && (l.read || (p.blind.B.solo && l.role === 'hero'))) for (const o of l.ops) if (o.t && o.at !== undefined) for (const ch of o.t) have.set(ch, (have.get(ch) || 0) + 1);
+    for (const ch of T[k].replace(/[，。：「」]/g, '')) have.set(ch, (have.get(ch) || 0) - 1);
+    assert.ok([...have.values()].every(v => v >= 0), c.id + ' ' + k + ' ' + seed);
+  }
+  for (const id of ['chirashi', 'hana', 'primary', 'module', 'dense', 'spread', 'billow', 'quad', 'serial']) assert.ok(seen.has(id), '排不出来：' + id);
+  assert.deepEqual(S.BLIND_COMPS.slice(-S.BLIND_STYLE.length), S.BLIND_STYLE);
+  assert.deepEqual(S.BLIND_LOOKS.slice(-2).map(k => k.id), ['bokashi', 'benday']);
+});
+test('🔒 存为常用：同样的字再用，一模一样；开关题头日期，版面也多半不动', () => {
+  const text = '灯下翻旧账，纸页有些返潮。有人说，字要一笔一笔写，路要一步一步走。窗外的雨停了又下。', body = p => JSON.stringify(p.blind.B.layers.filter(l => l.role !== 'meta' && !l.note).map(l => l.ops.map(o => [o.t, Math.round(o.x), Math.round(o.y)])));
+  let same = 0, meta = 0, n = 0; const st0 = { ...base(), text, showHeader: false, showSource: false, showDate: false, source: '某页', date: '2026.11.25' };
+  for (let seed = 1; seed <= 40; seed++){
+    let blind = { v: 2, seed: seed * 7919 }; const a = S.planPages({ ...st0, blind }, makeGauge); if (!a.blind) continue; n++;
+    const pin = a.blind.pin; blind = { ...blind, comp: pin.comp, look: pin.look, hero: pin.hero, word: pin.word };
+    const b = S.planPages({ ...st0, blind }, makeGauge), kept = JSON.parse(JSON.stringify({ ...blind, pal: b.blind.pal, keep: { turn: b.blind.turn, room: b.blind.room } }));
+    if (body(S.planPages({ ...st0, blind: S.blindFor(kept, text, '') }, makeGauge)) === body(b)) same++;
+    if (body(S.planPages({ ...st0, showSource: true, showDate: true, blind: S.blindFor(kept, text, '') }, makeGauge)) === body(b)) meta++;
+  }
+  assert.equal(same, n); assert.ok(meta / n > .55, `题头日期一开就变的太多：${meta}/${n}`);
+});
+test('老盒子（没有 v）照老样子算', () => {
+  const p = S.planPages({ ...base(), text: '我把灯留着，等雪停。你若回来，不必敲门。', blind: { seed: 12345, comp: 'fall' } }, makeGauge);
+  const q = S.planPages({ ...base(), text: '我把灯留着，等雪停。你若回来，不必敲门。', blind: { v: 2, seed: 12345, comp: 'fall' } }, makeGauge);
+  assert.ok(p.blind && q.blind); assert.ok(S.blindAir({ ...base(), text: 'x' }, { seed: 12345 }));
+});

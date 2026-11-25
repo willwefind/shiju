@@ -89,7 +89,7 @@ function blindStage(st, S, rnd, pal, fonts, mk, margin = .056){
   B.body = (x, y, w, h, { vertical = false, max = 34, min = 22, va = 'top', ha, align = 'left', c = pal.i, layer } = {}) => {
     if (B.solo) return { x, y, w, h: 0, s: max };                   // 就这么一句，主角就是全文，不必再抄一遍
     // 短的、有好几小句的，按诗排：一句一行，长句在词缝里折，行首错落
-    if (B.verse === undefined) B.verse = B.cjk && B.N <= 100 && B.clauses.length >= 2 && B.clauses.length <= 10 && maybe(.8) ? P(['flush', 'stair', 'loose', 'loose', 'hang']) : '';
+    if (B.verse === undefined) B.verse = B.cjk && B.N <= 100 && B.clauses.length >= 2 && B.clauses.length <= 10 && (B.verseRnd || rnd)() < .8 ? bP(B.verseRnd || rnd, ['flush', 'stair', 'loose', 'loose', 'hang']) : '';
     if (B.verse && w >= 90 && h >= 50){ const got = B.verseBody(x, y, w, h, { vertical, max: Math.round(max * 1.12), min, va, ha, align, c, layer }); if (got) return got; }
     const text = B.text, flowOf = items => items.reduce((a, it) => a + it.h, 0);
     const tryAt = (s, side) => {

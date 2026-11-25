@@ -14,6 +14,7 @@ const DEF = {
   inkLight: 0,          // 墨色明暗 −50…+50（正=往白走，负=往黑走）
   paperLight: 0,        // 纸张明暗 −50…+50
   theme: 'auto',        // 面板主题：auto 跟随系统 / day / night
+  blindAmt: null,       // 盲盒里效果 / 修图的浓度：调过一次，以后拆的都照它
   uiLang: 'auto',       // 面板语言：auto 跟着浏览器 / zh-CN / en（面板右上角那颗按钮换）
   myInks: [],           // [{id,name,c}] 自己调的墨
   align: 'left',        // 正文对齐（在版心里，不是贴纸边）

@@ -82,6 +82,7 @@ input[type=text]:disabled{opacity:.5}
      border-radius:4px;cursor:pointer;font-size:16px;line-height:1.35}
 .flist button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg)}
 .flist button[data-off=1]{opacity:.38}
+.flist button .rm{text-decoration:none;font:14px/1 sans-serif;opacity:.55;padding:2px 4px;margin:-2px -4px -2px 0}
 .flist button i{font-style:normal;font-size:10px;opacity:.6;font-family:-apple-system,sans-serif;margin-left:auto}
 .sub{font-size:10px;color:var(--dim);margin:10px 0 4px;letter-spacing:.08em}
 .fs{display:flex;gap:8px;align-items:center}
@@ -206,6 +207,7 @@ const pickFiles = accept => new Promise(res => {
 // onClose 在面板真正关掉后回调一次（嵌入方拿它恢复自己的阅读位置/焦点）。
 // 不传 init 时行为与从前完全相同 —— 网页选中路径一个字都没变。
 function openPanel(text, init = {}){
+  // 嵌在别人的阅读器里（给了 fontUrls）：人家承诺不联网，「从链接装字」那一栏就不出
   // 语言先落定再建面板：面板 HTML 是开面板时现拼的，t() 在拼的那一刻取词
   setStudioLocale(panelLocale(init.locale));
   // 嵌入方可为可再分发西文字体提供文件 URL（{latinId: url}）——选中才装载
@@ -318,6 +320,12 @@ function openPanel(text, init = {}){
 
         <div class="pane" data-p="font">
           <div class="sub">${t('font.body')}</div><div class="flist" id="font"></div>
+          <div id="flBox"${init.fontUrls ? ' hidden' : ''}><div class="fs" style="margin-top:6px">
+            <input type="text" id="fl" placeholder="${t('font.linkPh')}" aria-label="${t('font.linkPh')}" style="flex:1;padding:5px 7px;font-size:12px">
+            <button id="flGo" style="padding:6px 9px;border:1px solid var(--line);
+                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('font.linkGo')}</button>
+          </div>
+          <p class="pkhint">${t('font.linkHint')}</p></div>
           <div class="sub">${t('font.latin')}</div><div class="flist" id="latin"></div>
           <div class="sub">${t('font.title')}</div><div class="flist" id="swTitleFont"></div>
         </div>
@@ -392,6 +400,7 @@ function openPanel(text, init = {}){
   q('#ts').value = st.titleSize; q('#tsn').value = st.titleSize;
 
   // ── 画 ──────────────────────────────────────────────────────────
+  let warmFor = null;
   let plan = null, dragging = false, blindBar = null, full = null;
   // 盲盒里自己挑了纸 / 字 / 墨，那一样就归自己，别的照旧听种子的
   const ownIt = k => { if (blindBar) blindBar.own(k); };
@@ -405,6 +414,9 @@ function openPanel(text, init = {}){
   // 盲盒一张要好几道效果，满尺寸画一遍不便宜：预览先出草样，手停下来再补成导出的尺寸
   let fineTimer = 0, rough = false;
   const finish = () => { clearTimeout(fineTimer); if (!rough || !plan || !alive()) return; rough = false; pageCanvases.forEach((cv, i) => { if (plan.pages[i]) renderPage(cv, st, plan, i); }); };
+  // 屏幕上看得出差别才补：预览要是没放到比草样还大，草样就够清楚了（存图、复制之前照样先补）
+  const fineNeed = () => { const cv = pageCanvases[0]; return !!(cv && plan && cv.getBoundingClientRect().width * (window.devicePixelRatio || 1) > plan.W * 1.15); };
+  const fineSoon = () => { clearTimeout(fineTimer); if (rough && fineNeed()) fineTimer = setTimeout(settle, 1600); };
   const settle = () => (typeof requestIdleCallback === 'function' ? requestIdleCallback(() => finish(), { timeout: 2500 }) : finish());      // 等浏览器真闲下来再补
   const draw = () => {
     if (!alive()) return;
@@ -413,7 +425,7 @@ function openPanel(text, init = {}){
     st.sourcePrefix = q('#sp').value;
     if (dragging){ redrawOnly(); return; }
     try {
-      plan = planPages(st);
+      plan = (blindBar && blindBar.take()) || planPages(st);
       const box = q('#pgs'), same = !!plan.blind && pageCanvases.length === plan.pages.length && box.children.length === plan.pages.length;
       if (!same){ box.textContent = ''; pageCanvases = []; }
       clearTimeout(fineTimer); rough = !!plan.blind;
@@ -486,7 +498,8 @@ function openPanel(text, init = {}){
         if (im && !im.complete) im.addEventListener('load', draw, { once: true });
       }
       if (blindBar) blindBar.refresh(plan);
-      if (rough) fineTimer = setTimeout(settle, 1600);
+      if (rough) fineSoon();
+      prime(); if (warmFor !== st.title + st.text){ warmFor = st.title + st.text; prewarm(); }
     } catch (e){ tipEl.textContent = t('count.renderFail', { msg: e.message }); }
   };
   // 打字的时候盲盒别一字一画（一张要一两百毫秒），停手再画
@@ -625,6 +638,7 @@ function openPanel(text, init = {}){
   q('#psSave').onclick = () => {
     const name = (q('#psn').value || '').trim().slice(0, 24) || t('preset.defaultName', { n: (cfg('presets') || []).length + 1 });
     const style = {}; for (const k of STYLE_KEYS) style[k] = st[k];
+    if (st.blind && blindBar) style.blind = blindBar.frozen();      // 正拆着盲盒：跟「存为常用」一样记全
     setCfg('presets', (cfg('presets') || []).concat([{ id: 'ps' + Date.now(), name, style }]));
     q('#psn').value = '';
     buildPresets();
@@ -811,7 +825,7 @@ function openPanel(text, init = {}){
       if ((!f.probes.length && !withSys) || !fontAvailable(f)) continue;
       tb.append(fontRow(f.id, tName('font', f.id, f.name), cjkStack(f.id), t('font.hintCjk')));
     }
-    for (const f of cfg('myFonts')) tb.append(fontRow(f.id, f.name, `"${f.id}"`, t('font.hintCustom')));
+    for (const f of cfg('myFonts')) if (loadedCustom.has(f.id)) tb.append(fontRow(f.id, f.name, `"${f.id}"`, t('font.hintCustom')));
     for (const l of LATIN){
       if (!l.probes.length) continue;
       const hit = resolveFont(l); if (!hit) continue;
@@ -819,6 +833,37 @@ function openPanel(text, init = {}){
     }
   }
 
+  const askFonts = names => { const v = prompt(t('font.askMany', { n: names.length, list: names.slice(0, 40).map((s, i) => (i + 1) + '. ' + s).join('\n') }), '1'); return v === null ? null : [...new Set(v.split(/[^0-9]+/).map(Number))].filter(i => i >= 1 && i <= names.length).slice(0, 8).map(i => i - 1); };
+  const fontSay = (e, name) => t('font.err_' + (e && e.code || 'bad'), { name, ...(e && e.x || {}) });
+  const fontDone = (got, bad) => {
+    if (!alive()) return;
+    if (got.length){ dropFontProbes(); buildFonts(); sync(); draw(); }
+    tipEl.textContent = [got.length ? t(got.some(f => f.here) ? 'font.addedHere' : got.some(f => f.faces) ? 'font.addedLink' : 'font.added', { name: got.map(f => f.name).join('、') }) : '', ...bad].filter(Boolean).join(' ');
+  };
+  q('#flGo').onclick = async () => {
+    const v = q('#fl').value.trim(), b = q('#flGo'); if (!v){ tipEl.textContent = t('font.err_noLink', { name: '' }); return; }
+    b.disabled = true; tipEl.textContent = t('font.linking');
+    try { const got = await fontFromLink(v, askFonts); if (alive() && got.length) q('#fl').value = ''; fontDone(got, []); } catch (e){ fontDone([], [fontSay(e, v.slice(0, 60))]); }
+    b.disabled = false;
+  };
+  q('#fl').onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); q('#flGo').click(); } };
+  // 盲盒头一回碰一款字，要把文件从硬盘上搬进来再验字形，大的要半秒。趁人停手的时候一款一款先认好，拆的时候就不顿
+  let warmT = 0;
+  const prewarm = () => {
+    clearTimeout(warmT);
+    warmT = setTimeout(() => {
+      if (!alive()) return;
+      const read = () => q('#ti').value + q('#t').value, txt = read(), todo = [...new Set(Object.values(B_TYPE).flat().map(f => f[0]).concat(myFontList().map(f => f.id)))], idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 4000 }) : setTimeout(fn, 60));
+      if (!txt.trim()) return;
+      const step = () => { if (!alive() || read() !== txt) return; const f = todo.shift(); if (!f) return; const real = bReal(f); if (real) bHasGlyphs(real, txt); idle(step); };
+      idle(step);
+    }, 900);
+  };
+  // 链接来的字：用到的那几片取齐了再画一遍。正拆着盲盒，只有这张用着它才重画，不然脸会换
+  const prime = () => {
+    const ids = st.blind ? null : [st.font, st.titleFont, st.latinFont].concat([...st.spans, ...st.titleSpans].map(s => s.font || (s.style && s.style.font))), p = fontPrime(st.text + st.title + st.source + st.headText, ids);
+    if (p) p.then(any => { if (!any || !alive()) return; if (!st.blind || (plan && plan.blind && (cfg('myFonts') || []).some(f => f.faces && Object.values(plan.blind.fonts).some(v => typeof v === 'string' && v.includes(f.id))))) draw(); });
+  };
   function buildFonts(){
     // 正文字体
     const box = q('#font'); box.textContent = '';
@@ -829,14 +874,19 @@ function openPanel(text, init = {}){
       box.append(b);
     }
     for (const f of cfg('myFonts')){
-      const b = fontRow(f.id, f.name, `"${f.id}"`, t('font.hintCustom'));
+      const away = f.idb && !loadedCustom.has(f.id), b = fontRow(f.id, f.name, `"${f.id}"`, f.faces ? t('font.hintLink') : away ? t('font.hintAway') : t('font.hintCustom'), away);
       b.title = t('tip.rightDelete');
-      b.oncontextmenu = e => {
-        e.preventDefault();
+      const drop = () => {
+        if (f.idb) fontDel(f.id); if (f.faces) fontPiecesDel(f.id);
         setCfg('myFonts', cfg('myFonts').filter(x => x.id !== f.id));
         if (st.font === f.id){ st.font = 'sys'; setCfg('font', 'sys'); }
         buildFonts(); sync(); draw();
       };
+      b.oncontextmenu = e => { e.preventDefault(); drop(); };
+      // 手机上没有右键
+      const x = document.createElement('u'); x.className = 'rm'; x.textContent = '×'; x.title = t('blind.del');
+      x.onclick = e => { e.stopPropagation(); if (confirm(t('font.deleteConfirm', { name: f.name }))) drop(); };
+      b.append(x);
       box.append(b);
     }
 
@@ -871,19 +921,12 @@ function openPanel(text, init = {}){
     add.textContent = t('font.add'); add.style.fontSize = '12px';
     add.title = t('font.addTitle');
     add.onclick = async () => {
-      const files = await pickFiles('.ttf,.otf,.woff,.woff2,font/*'); if (!files.length) return;
-      const list = cfg('myFonts').slice();
-      for (const f of files){
-        if (f.size > 12*1024*1024){
-          tipEl.textContent = t('font.tooBig', { name: f.name, mb: (f.size/1e6).toFixed(0) });
-          continue;
-        }
-        try { list.push({ id:'f'+Date.now()+Math.floor(Math.random()*1e4),
-                          name: f.name.replace(/\.[^.]+$/, '').slice(0, 24),
-                          data: await readFile(f, 'url') }); }
-        catch { tipEl.textContent = t('font.installFail', { name: f.name }); }
-      }
-      setCfg('myFonts', list); await ensureCustomFonts(); buildFonts(); sync(); draw();
+      // 手机上按扩展名筛，字体文件常常是灰的点不动：触屏就不筛，认文件头
+      let touch = false; try { touch = matchMedia('(pointer: coarse)').matches; } catch {}
+      const files = await pickFiles(touch ? '' : '.ttf,.otf,.ttc,.woff,.woff2,.zip,font/*'); if (!files.length) return;
+      const got = [], bad = [];
+      for (const f of files){ tipEl.textContent = t('font.reading', { name: f.name }); try { got.push(...await fontFromBytes(f.name, await readFile(f), askFonts)); } catch (e){ bad.push(fontSay(e, f.name)); } }
+      fontDone(got, bad);
     };
     box.append(add);
 
@@ -965,7 +1008,7 @@ function openPanel(text, init = {}){
     repaint: draft => {
       plan = planPages(st); if (!plan.blind || !pageCanvases[0]) return null;
       const post = plan.blind.B.post; if (draft) plan.blind.B.post = [];
-      clearTimeout(fineTimer); withDPR(1, () => renderPage(pageCanvases[0], st, plan, 0)); rough = true; fineTimer = setTimeout(settle, 1600); plan.blind.B.post = post;
+      clearTimeout(fineTimer); withDPR(1, () => renderPage(pageCanvases[0], st, plan, 0)); rough = true; fineSoon(); plan.blind.B.post = post;
       return plan;
     },
     kept: { list: () => (cfg('presets') || []).filter(p => p.style && p.style.blind),
@@ -977,7 +1020,7 @@ function openPanel(text, init = {}){
       setCfg('presets', (cfg('presets') || []).concat([{ id: 'ps' + Date.now(), name, style }]));
       buildPresets();
     } });
-  full = mountFull({ resume: back && back.full, mask, alive, tipEl });
+  full = mountFull({ resume: back && back.full, mask, alive, tipEl, changed: () => fineSoon() });
   q('#hd').oninput = () => { setCfg('headText', q('#hd').value); drawTyping(); };
 
   const close = () => {
@@ -1003,6 +1046,7 @@ function openPanel(text, init = {}){
 
   // ── 存 / 复制 ───────────────────────────────────────────────────
   q('#save').onclick = async () => {
+    await Promise.race([fontBusy, new Promise(r => setTimeout(r, 4000))]);      // 链接来的字还在路上：等一等
     finish();
     const n = pageCanvases.length;
     const stamp = stampName();
@@ -1056,7 +1100,7 @@ function openPanel(text, init = {}){
   buildPapers(); buildFonts(); buildInks(); buildPresets(); sync(); draw();
   if (back && back.tab === 'box' && st.blind) q('#tabs button[data-v="box"]').click();      // 「盒」那一屏要等盲盒画出来才有
   if (blank && !back) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
-  ensureCustomFonts().then(() => { if (!alive()) return; buildFonts(); sync(); draw(); });
+  ensureCustomFonts().then(() => { if (!alive()) return; dropFontProbes(); buildFonts(); sync(); draw(); prewarm(); });
   // 嵌入方捆的字（一款一二十兆）可能这会儿才下完：单子刷新；正拆着盲盒就不动那张脸
   try { document.fonts.addEventListener('loadingdone', function again(){ if (!alive()){ document.fonts.removeEventListener('loadingdone', again); return; } const n = FONTS.filter(fontAvailable).length; dropFontProbes(); if (FONTS.filter(fontAvailable).length === n) return; buildFonts(); sync(); if (!st.blind) draw(); }); } catch {}
   Promise.all(cfg('myPapers').map(p => new Promise(r => {
@@ -1084,5 +1128,5 @@ function shrink(dataUrl){
   });
 }
 const storedBytes = () => cfg('myPapers').reduce((a,p) => a + p.data.length, 0)
-                        + cfg('myFonts').reduce((a,f) => a + f.data.length, 0);
+                        + cfg('myFonts').reduce((a,f) => a + (f.data || '').length, 0);
 

@@ -37,6 +37,9 @@ const BLIND_CSS = `
 .bx .one{border:1px solid var(--on-bg);border-radius:5px;padding:9px;background:var(--field);margin-top:7px}
 .bx .one .fs{margin-top:5px;font-size:11px;color:var(--dim)}
 .bx .one .fs span{flex:0 0 34px}
+.bx .amts{margin-top:10px}
+.bx .amts .fs{margin-top:4px;font-size:11px;color:var(--dim)}
+.bx .amts .fs>span:first-child{flex:0 0 62px}
 .bx .dots{display:flex;gap:6px;align-items:center;margin-top:7px}
 .bx .dots button{width:20px;height:20px;border-radius:50%;border:1px solid rgba(128,128,128,.4);padding:0;cursor:pointer}
 .bx .dots button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
@@ -72,12 +75,13 @@ const blindHtml = () => `
     <div class="kept" id="bKept" hidden></div>
   </div>`;
 // 方案分三堆：低声的、意象、响亮的
-const B_COMP_GROUPS = () => [['quiet', BLIND_COMPS.filter(c => c.q && c.id !== 'image' && c.id !== 'youme')], ['warm', BLIND_MORE], ['long', BLIND_LONG], ['image', BLIND_COMPS.filter(c => c.id === 'image' || c.id === 'youme')], ['loud', BLIND_COMPS.filter(c => !c.q && !c.long && !BLIND_MORE.includes(c))]];
+const B_COMP_GROUPS = () => [['quiet', BLIND_COMPS.filter(c => c.q && !c.g && c.id !== 'image' && c.id !== 'youme')], ['warm', BLIND_MORE], ['long', BLIND_LONG], ['image', BLIND_COMPS.filter(c => c.id === 'image' || c.id === 'youme')], ['jp', BLIND_STYLE.filter(c => c.g === 'jp')], ['intl', BLIND_STYLE.filter(c => c.g === 'intl')], ['pop', BLIND_STYLE.filter(c => c.g === 'pop')], ['loud', BLIND_COMPS.filter(c => !c.q && !c.long && !c.g && !BLIND_MORE.includes(c))]];
 const bAcc = (k, inner) => `<details class="acc" data-k="${k}"><summary>${t('blind.s_' + k)}<em id="bNow_${k}"></em></summary><div class="accin">${inner}</div></details>`;
 const blindPaneHtml = () => `
   <div class="pane bx" data-p="box">
     <div class="two"><button id="bUndo">${t('blind.undo')}</button><button id="bRedo">${t('blind.redo')}</button></div>
     <div class="sub">${t('blind.reroll')}</div><div class="chips" id="bRe"></div>
+    <div class="amts">${['fx', 'post'].map(k => `<div class="fs" data-k="${k}"><span>${t('blind.amt_' + k)}</span><input type="range" min="0" max="100" step="1" aria-label="${t('blind.amt_' + k)}"><span class="val"></span></div>`).join('')}</div>
     <div class="one" id="bOne" hidden>
       <div class="pkh"><b id="bOneName"></b><button id="bOneDel">${t('blind.del')}</button></div>
       <div id="bSwapBox"><div class="chips" id="bSwap"></div></div>
@@ -101,7 +105,7 @@ const blindPaneHtml = () => `
     ${bAcc('add', `<div class="chips" id="bItems"></div><div id="bAdd"></div>`)}
   </div>`;
 
-function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab }){
+function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab, ready }){
   const q = s => mask.querySelector(s);
   // 一个盒子 ＝ 它自己的一串改动；盒子之间前后翻，盒子里头一步一步撤
   const boxes = resume ? resume.boxes : []; let at = resume ? resume.at : -1, plan = null, sel = null, name = '', short = '', label = '', lookNow = '';
@@ -126,34 +130,47 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     if (!(q('#t').value.trim() || q('#ti').value.trim())){ tip(t('blind.empty')); return; }
     // 连着两次同一种方案就没意思了，多掷几颗挑一颗不一样的
     // 每拆一个都是全新的：上一个盒子里换的纸、挑的字，留在上一个盒子里
-    const base = {};
-    let seed = blindSeed();
-    for (let i = 0; i < 6 && label; i++){
-      const p = planPages({ ...st, ...texts(), blind: { ...base, seed } });
-      if (!p.blind || (p.blind.comp !== label && p.blind.look.id !== lookNow)) break;
-      seed = blindSeed();
+    const amt = cfg('blindAmt'), base = { v: 2, ...(amt ? { amt } : {}) }, mk = () => ({ ...base, seed: blindSeed() });
+    undress();
+    // 先看一眼气氛，跟上一张一样就不必排；方案要排完才知道，最多多排两回。排好的那张直接拿去画
+    let bl = mk(), got = null;
+    for (let i = 0, full = 0; i < 12 && label && full < 2; i++){
+      if (blindAir({ ...st, ...texts() }, bl) !== lookNow){ full++; got = planPages({ ...st, ...texts(), blind: bl }); if (!got.blind || got.blind.comp !== label) break; got = null; }
+      bl = mk();
     }
-    st.blind = { ...base, seed }; sel = null;
+    st.blind = bl; sel = null; hot = got ? { bl, plan: got } : null;
     boxes.push({ hist: [st.blind], i: 0 }); at = boxes.length - 1; lastTag = '';
     apply();
   };
-  const jump = n => { at = n; st.blind = box().hist[box().i]; sel = null; apply(); };
+  // 排好了还没画的那一张（拆的时候为了不重样先排过），画的时候别再排一遍
+  let hot = null;
+  const take = () => { const h = hot; hot = null; return h && h.bl === st.blind ? h.plan : null; };
+  // 常用版式连着它当时的横竖、题头出处日期、用的字：只管这一个盒子，换盒子、合上，就还回去
+  let worn = null;
+  const undress = () => { if (worn) for (const [k, v] of Object.entries(worn.now)) if (st[k] === v) st[k] = worn.was[k]; worn = null; };
+  const dress = set => { undress(); if (!set) return; worn = { now: set, was: {} }; for (const k of Object.keys(set)){ worn.was[k] = st[k]; st[k] = set[k]; } };
+  const jump = n => { at = n; dress(box().set); st.blind = box().hist[box().i]; sel = null; apply(); };
   q('#bPrev').onclick = () => { if (at > 0) jump(at - 1); };
   q('#bNext').onclick = () => { if (at < boxes.length - 1) jump(at + 1); };
   q('#bUndo').onclick = () => { const b = box(); if (b && b.i > 0){ b.i--; st.blind = b.hist[b.i]; lastTag = ''; apply(); } };
   q('#bRedo').onclick = () => { const b = box(); if (b && b.i < b.hist.length - 1){ b.i++; st.blind = b.hist[b.i]; lastTag = ''; apply(); } };
-  q('#bOff').onclick = () => { st.blind = null; sel = null; apply(); };
+  q('#bOff').onclick = () => { undress(); st.blind = null; sel = null; apply(); };
   q('#bEdit').onclick = () => openTab('box');
   // 常用版式：收下的时候把颜色也定死，以后换一段字、换一个版本，都还是它
   let open = !!(resume && resume.open);
-  q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, { ...st.blind, pal: { ...plan.blind.pal } }); open = true; fillKept(); tip(t('blind.kept', { name: n })); };
+  const frozen = () => {
+    const p = plan.blind, { cls, canon, big, hero, heroW, body, bodyW, meta, metaW } = p.fonts, own = st.blind.own || {};
+    return { ...st.blind, pal: { ...p.pal }, keep: { turn: p.turn, room: p.room, ...(own.font ? {} : { face: { cls, canon, big, hero, heroW, body, bodyW, meta, metaW } }) } };
+  };
+  const setOf = p => { const s = {}; for (const k of ['orient', 'showHeader', 'showSource', 'showDate'].concat((p.style.blind.own || {}).font ? ['font', 'latinFont', 'titleFont'] : [])) if (k in p.style) s[k] = p.style[k]; return s; };
+  q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, frozen()); open = true; fillKept(); tip(t('blind.kept', { name: n })); };
   function fillKept(){
     const list = kept.list(), box = q('#bKept'); box.textContent = ''; q('#bMine').hidden = !list.length; box.hidden = !list.length || !open;
     q('#bMine').textContent = t('blind.mine', { n: list.length }); q('#bMine').setAttribute('aria-expanded', open && !!list.length);
     for (const p of list){
       const s = document.createElement('span'), b = document.createElement('button'), x = document.createElement('button');
       b.textContent = p.name; b.title = t('blind.mineUse'); x.textContent = '×'; x.title = t('blind.del'); x.setAttribute('aria-label', t('blind.del')); s.append(b, x); box.append(s);
-      b.onclick = () => { const { text, title } = texts(); if (!(text.trim() || title.trim())){ tip(t('blind.empty')); return; } st.blind = blindFor({ ...p.style.blind }, text, title); sel = null; boxes.push({ hist: [st.blind], i: 0 }); at = boxes.length - 1; lastTag = ''; apply(); if (plan && plan.blind && p.style.blind.comp && plan.blind.comp !== p.style.blind.comp) tip(t('blind.compNo', { name: t('bc.' + p.style.blind.comp) })); };
+      b.onclick = () => { const { text, title } = texts(); if (!(text.trim() || title.trim())){ tip(t('blind.empty')); return; } const set = setOf(p); dress(set); st.blind = blindFor({ ...p.style.blind }, text, title); sel = null; boxes.push({ hist: [st.blind], i: 0, set }); at = boxes.length - 1; lastTag = ''; apply(); if (plan && plan.blind && p.style.blind.comp && plan.blind.comp !== p.style.blind.comp) tip(t('blind.compNo', { name: t('bc.' + p.style.blind.comp) })); };
       b.ondblclick = () => { const v = prompt(t('preset.renamePrompt'), p.name); if (v === null) return; kept.rename(p.id, v.trim().slice(0, 24) || p.name); fillKept(); };
       x.onclick = () => { if (!confirm(t('preset.deleteConfirm', { name: p.name }))) return; kept.remove(p.id); fillKept(); };
     }
@@ -168,15 +185,24 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     const b = e.target.closest('button'); if (!b || !st.blind) return;
     const k = b.dataset.k, patch = { seeds: { ...(st.blind.seeds || {}), [k]: blindSeed() } };
     // 重掷某一样，就把人在这一样上定死的放开
-    if (k === 'comp') Object.assign(patch, { comp: undefined, move: undefined });
+    if (k === 'comp') Object.assign(patch, { comp: undefined, move: undefined, keep: undefined });
     if (k === 'hero') Object.assign(patch, { move: undefined, hero: undefined, word: undefined });
     if (k === 'pal') Object.assign(patch, { pal: undefined, own: { ...(st.blind.own || {}), paper: false, ink: false } });
-    if (k === 'font') patch.own = { ...(st.blind.own || {}), font: false };
+    if (k === 'font'){ patch.own = { ...(st.blind.own || {}), font: false }; if (st.blind.keep) patch.keep = { ...st.blind.keep, face: undefined }; }
     if (k === 'look') Object.assign(patch, { look: undefined, fx: undefined, post: undefined });
     if (k === 'fx') patch.fx = undefined;
     if (k === 'post') patch.post = undefined;
     go(patch);
   };
+
+  // ── 浓淡：效果（字上的）和修图（整张的）各一根 ──────────────────
+  let amtWait = 0;
+  mask.querySelectorAll('.bx .amts input').forEach(inp => inp.oninput = () => {
+    const k = inp.parentElement.dataset.k, v = +inp.value / 100; inp.nextElementSibling.textContent = inp.value + '%';
+    if (!st.blind) return;
+    const amt = { fx: 1, post: 1, ...(st.blind.amt || {}), [k]: v }; set({ amt }, 'amt' + k); lastAt = Date.now(); setCfg('blindAmt', amt.fx >= 1 && amt.post >= 1 ? null : amt);
+    if (!amtWait) amtWait = setTimeout(() => { amtWait = 0; if (alive()) apply(); }, 30);      // 拖着的时候别一像素画一张
+  });
 
   // ── 画面上的东西 ────────────────────────────────────────────────
   const items = () => plan.blind.B.items;
@@ -223,7 +249,8 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
   mask.querySelectorAll('.acc').forEach(d => d.addEventListener('toggle', () => { if (d.open) mask.querySelectorAll('.acc').forEach(o => { if (o !== d) o.open = false; }); }));
   q('#bComp').onclick = e => {
     const b = e.target.closest('button'); if (!b || !st.blind) return;
-    const was = st.blind; set({ comp: b.dataset.v, move: undefined, seeds: { ...(was.seeds || {}), comp: blindSeed() } });
+    // 换一种方案：种子不动，换回来还是原来那张。点的就是正用着的那种，才另掷一张
+    const was = st.blind, again = plan && plan.blind && plan.blind.comp === b.dataset.v; set({ comp: b.dataset.v, move: undefined, ...(again ? { keep: undefined, seeds: { ...(was.seeds || {}), comp: blindSeed() } } : {}) });
     apply();
     if (plan && plan.blind && plan.blind.comp !== b.dataset.v) tip(t('blind.compNo', { name: t('bc.' + b.dataset.v) }));
   };
@@ -379,6 +406,7 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     name = [short].concat(n.fx.map(f => t('bf.' + f)), n.post.map(f => t('bp.' + f)), n.scene.map(s => t('bs.' + s))).join(' · ');
     q('#bName').textContent = name;
     const own = st.blind.own || {}, B = plan.blind.B, pal = plan.blind.pal;
+    mask.querySelectorAll('.bx .amts .fs').forEach(d => { const v = Math.round(100 * ((st.blind.amt || {})[d.dataset.k] === undefined ? 1 : st.blind.amt[d.dataset.k])), i = d.querySelector('input'); if (+i.value !== v) i.value = v; d.lastElementChild.textContent = v + '%'; });
     q('#bNow_pal').textContent = pal.src === 'tune' ? t('blind.tuned') : (pal.name || '');
     press('#bComp', v => v === n.comp); press('#bLook', v => v === n.look); press('#bFx', v => v ? n.fx.includes(v) : !n.fx.length); press('#bFx2', v => n.fx.includes(v)); press('#bPost', v => v ? B.post.includes(v) : !B.post.length);
     press('#bPals', v => v === pal.id); press('#bLock', v => !!own[v]);
@@ -390,6 +418,6 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
   const editing = on => mask.classList.toggle('bedit', on);
   const drop = () => { if (!sel) return false; sel = null; refreshOne(); overlay(); return true; };
   refreshOne();
-  return { refresh, editing, drop, state: () => ({ boxes, at, open }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
+  return { refresh, editing, drop, take, frozen: () => (plan && plan.blind && st.blind ? frozen() : st.blind), state: () => ({ boxes, at, open }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
 }
 

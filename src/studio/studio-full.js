@@ -58,7 +58,7 @@ function fullAsk(still){
   try { const r = ask.call(el, { navigationUI: 'hide' }); if (r && r.then) r.then(() => { if (!still()){ fullOwn = true; fullLeave(); } }, no); } catch { no(); }
 }
 
-function mountFull({ resume, mask, alive, tipEl }){
+function mountFull({ resume, mask, alive, tipEl, changed: told }){
   const q = s => mask.querySelector(s), small = () => { try { return matchMedia('(max-width: 760px)').matches; } catch { return false; } };
   let on = false, sheet = true, leftAt = 0, tipTimer = 0;
   const paint = () => {
@@ -67,6 +67,7 @@ function mountFull({ resume, mask, alive, tipEl }){
     q('#fSheet').hidden = !on; q('#fSheet').textContent = sheet ? t('full.hide') : t('full.show'); q('#fSheet').setAttribute('aria-expanded', String(sheet));
     q('#fSave').hidden = !on || sheet;
     if (!on || sheet) q('#fTip').hidden = true;
+    if (told) told();      // 纸变大了，草样可能就不够清楚了
   };
   const go = v => { if (on === v) return; on = v; if (on){ sheet = !small(); fullAsk(() => on && alive()); } else fullLeave(); paint(); };
   q('#fGo').onclick = () => go(!on);
