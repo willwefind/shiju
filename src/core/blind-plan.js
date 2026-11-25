@@ -126,7 +126,7 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
       for (const l of B.layers){ l.rect = blindRect(B, l); l.avg = blindAvg(l); }
       if (!blindFits(B)) continue;
       if (whole && !blindKeepsAll(B)) continue;
-      blindUnder(B, bRng(bSub(sd.comp, 77 + it.i)), c, v2 ? bRng(bSub(sd.comp, 1177 + it.i)) : null);
+      blindUnder(B, bRng(bSub(sd.comp, 77 + it.i)), c, v2);
       blindMoves(B, bl.move);
       blindStyle(B, st);
       for (const l of B.layers) if (l.twin) { l.ops = B.layers[l.of].ops.map(o => ({ ...o, c: o.styled ? o.c : l.tc, rich: undefined })); l.rect = B.layers[l.of].rect; l.avg = B.layers[l.of].avg; }
@@ -163,11 +163,11 @@ const bP = (rnd, arr) => arr[Math.floor(rnd() * arr.length)];
 // 满得已经放不下一层淡字的那些
 const B_FULL = Object.fromEntries(['block', 'vblock', 'pack', 'field', 'micro', 'mosaic', 'contour', 'shift', 'image', 'youme', 'void', 'drift', 'ear', 'underlay', 'canon', 'ramp', 'rain', 'giant', 'overprint', 'panel', 'half', 'slit', 'depth', 'frame'].map(k => [k, 1]));
 const B_LOUD = Object.fromEntries(['block', 'vblock', 'pack', 'skyline', 'ramp', 'contour', 'overprint', 'cut', 'shutter', 'slit', 'micro', 'giant', 'grainy', 'shift', 'half', 'mosaic', 'tilt'].map(k => [k, 1]));
-// 垫底的淡字和边注：都是从正文里来的回声（没有 at，不算正文）
-function blindUnder(B, rng, c, rng2){
+// 垫底的淡字：是从正文里来的回声（没有 at，不算正文）
+function blindUnder(B, rng, c, v2){
   const { R, P, maybe } = rng, { W, H, A, M, pal, u, look } = B, heavy = /Black|Heavy|900/.test(B.fonts.hero + B.fonts.heroW), busy = B.layers.some(l => l.role === 'deco' && l.ops.some(o => o.k === 'g') || l.role === 'back');
   const key = B.hero ? B.hero.units : B.keyClause ? B.keyClause.units : B.core.slice(0, 4), ghost = key.map(q => ({ ...q, at: undefined }));
-  const p0 = v => (rng2 ? (x => () => x)(maybe(v)) : () => maybe(v)), want = p0((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1));
+  const p0 = v => (v2 ? (x => () => x)(maybe(v)) : () => maybe(v)), want = p0((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1));
   if (!B_FULL[c.id] && !busy && B.cjk && want((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1))){
     const blur = maybe(.6) ? (look.ghost === undefined ? 5 : look.ghost) * R(.6, 1.6) * u : 0, col = P([pal.i, pal.i, B.kin]), al = (heavy ? R(.045, .08) : R(.07, .13)) * (blur > 4 ? 1.5 : 1) * (B.dark ? 1.15 : 1), l = B.layer('deco', { bleed: true, under: true, ...(blur ? { soft: blur } : {}) }), kind = P(['char', 'char', 'col', 'row', 'verse']);
     const body = B.layers.filter(q => q.role === 'body' || q.body).flatMap(q => q.ops.map(o => blindOpRect(B, o))).filter(Boolean), left = body.length ? body.reduce((s, r) => s + r.x + r.w / 2, 0) / body.length < W / 2 : maybe(.5);
@@ -176,19 +176,7 @@ function blindUnder(B, rng, c, rng2){
     else if (kind === 'row'){ const s = Math.min(W * R(1.15, 1.5) / B.emOf(ghost), H * .4); B.row(l, ghost, W * R(.4, .6), H * R(.2, .8), s, { c: col, a: al }); }
     else { const s = Math.min(W * .9 / B.emOf(ghost), H * .1), n = Math.ceil(H / (s * 1.16)), dx = R(-.5, .5) * s; for (let i = -1; i <= n; i++) B.row(l, ghost, W / 2 + dx * (i - n / 2), s * 1.16 * (i + .5), s, { c: col, a: al * (.45 + .55 * Math.abs(Math.sin(i * .7 + 1))) }); }
   }
-  // 没写题头出处日期的，边上也别空得像没做完：拿正文里的词当边注，很小
-  if (rng2) blindNote(B, rng2, key); else blindNote(B, rng, key);
-}
-function blindNote(B, { R, P, maybe }, key){
-  const { W, H, M, pal, u } = B;
-  if (!B.metaItems().length && B.cjk && B.N > 8 && maybe(.55)){
-    const z = R(14, 18) * u, l = B.layer('deco', { note: true }), soft = { c: pal.i, a: .72, f: 'meta' }, first = B.clauses[0], last = B.clauses[B.clauses.length - 1], cut = (us, n, end) => (end ? us.slice(-n) : us.slice(0, n)).map(q => ({ ...q, at: undefined })), y0 = M * .52, y1 = H - M * .52, gap = R(.1, .6), kind = P(['corner', 'corner', 'side', 'one', 'four']);
-    const put = (us, x, y, align) => B.row(l, us, x, y, z, { align, gap, ...soft });
-    if (kind === 'corner'){ put(cut(first.units, 4), M, y0, 'left'); put(cut(last.units, 4, true), W - M, y1, 'right'); }
-    else if (kind === 'one') put(cut(key, 6), P([M, M, W - M]) === M ? M : M, P([y0, y1]), 'left');
-    else if (kind === 'side'){ const us = cut(key, 8), n = B.colLen(us, 'meta', gap) * z, right = maybe(.5); B.col(l, us, right ? W - M * .46 : M * .46, P([M, H - M - n, (H - n) / 2]), z, { gap, ...soft }); }
-    else { const ws = [...key.slice(0, 4)], at = [[M, y0, 'left'], [W - M, y0, 'right'], [M, y1, 'left'], [W - M, y1, 'right']]; if (ws.length === 4) ws.forEach((w, i) => put([{ ...w, at: undefined }], ...at[i])); else put(cut(key, 4), M, y0, 'left'); }
-  }
+  // 🔒 没写题头、出处、日期，角落就空着（2026-11-25）：早先拿正文里的词填在边上，人家没要
 }
 
 // 淡的、软的香槟色，替掉暗底上的金 —— 金字是喜报，不是诗
@@ -426,7 +414,8 @@ function renderBlind(canvas, st, plan, idx){
   if (idx > 0) return renderPage(canvas, blind.innerSt, blind.inner, idx - 1);
   const { B, pal, sd } = blind, ctx = canvas.getContext('2d'), cache = new Map(), amt = { fx: 1, post: 1, ...((st.blind || {}).amt || {}) };
   if (canvas.width !== W * DPR || canvas.height !== H * DPR){ canvas.width = W * DPR; canvas.height = H * DPR; }      // 尺寸没变就别重新要一块
-  else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  else if (ctx.reset) ctx.reset();      // 连上一张留下的笔（平滑、线帽、字距）一起清，不然同一张重画两遍会差一点点
+  else { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low'; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.miterLimit = 10; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, canvas.width, canvas.height); }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (!st.noGround) blindGround(ctx, W, H, pal, st, 0, blind.look, sd);
   B.bare = !!st.noGround;

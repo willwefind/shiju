@@ -51,6 +51,8 @@ export const VENDOR_ORDER = [
   'studio/studio-blind.js',
   'studio/studio-full.js',
   'studio/studio-fonts.js',
+  'studio/studio-thumbs.js',
+  'studio/studio-frame.js',
   'studio/studio-shell.js',
 ];
 

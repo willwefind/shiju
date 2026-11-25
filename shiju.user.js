@@ -1736,7 +1736,8 @@ function bCanvas(w, h){
   const i = bPool.findIndex(c => c.width === w && c.height === h);
   if (i >= 0){
     const c = bPool.splice(i, 1)[0], x = c.getContext('2d');
-    x.setTransform(1, 0, 0, 1, 0, 0);
+    if (x.reset){ x.reset(); if (x === bLastCtx) bLastRGB = -1; return c; }      // 连笔的状态一起清；颜色也回了黑，别当它还是上一种
+    x.setTransform(1, 0, 0, 1, 0, 0); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'low';
     x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
     x.clearRect(0, 0, w, h);
     return c;
@@ -4653,7 +4654,7 @@ function blindCompose(st, S, pal, fonts, mk, text, hero, word, bl, whole, sd, lo
       for (const l of B.layers){ l.rect = blindRect(B, l); l.avg = blindAvg(l); }
       if (!blindFits(B)) continue;
       if (whole && !blindKeepsAll(B)) continue;
-      blindUnder(B, bRng(bSub(sd.comp, 77 + it.i)), c, v2 ? bRng(bSub(sd.comp, 1177 + it.i)) : null);
+      blindUnder(B, bRng(bSub(sd.comp, 77 + it.i)), c, v2);
       blindMoves(B, bl.move);
       blindStyle(B, st);
       for (const l of B.layers) if (l.twin) { l.ops = B.layers[l.of].ops.map(o => ({ ...o, c: o.styled ? o.c : l.tc, rich: undefined })); l.rect = B.layers[l.of].rect; l.avg = B.layers[l.of].avg; }
@@ -4690,11 +4691,11 @@ const bP = (rnd, arr) => arr[Math.floor(rnd() * arr.length)];
 // 满得已经放不下一层淡字的那些
 const B_FULL = Object.fromEntries(['block', 'vblock', 'pack', 'field', 'micro', 'mosaic', 'contour', 'shift', 'image', 'youme', 'void', 'drift', 'ear', 'underlay', 'canon', 'ramp', 'rain', 'giant', 'overprint', 'panel', 'half', 'slit', 'depth', 'frame'].map(k => [k, 1]));
 const B_LOUD = Object.fromEntries(['block', 'vblock', 'pack', 'skyline', 'ramp', 'contour', 'overprint', 'cut', 'shutter', 'slit', 'micro', 'giant', 'grainy', 'shift', 'half', 'mosaic', 'tilt'].map(k => [k, 1]));
-// 垫底的淡字和边注：都是从正文里来的回声（没有 at，不算正文）
-function blindUnder(B, rng, c, rng2){
+// 垫底的淡字：是从正文里来的回声（没有 at，不算正文）
+function blindUnder(B, rng, c, v2){
   const { R, P, maybe } = rng, { W, H, A, M, pal, u, look } = B, heavy = /Black|Heavy|900/.test(B.fonts.hero + B.fonts.heroW), busy = B.layers.some(l => l.role === 'deco' && l.ops.some(o => o.k === 'g') || l.role === 'back');
   const key = B.hero ? B.hero.units : B.keyClause ? B.keyClause.units : B.core.slice(0, 4), ghost = key.map(q => ({ ...q, at: undefined }));
-  const p0 = v => (rng2 ? (x => () => x)(maybe(v)) : () => maybe(v)), want = p0((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1));
+  const p0 = v => (v2 ? (x => () => x)(maybe(v)) : () => maybe(v)), want = p0((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1));
   if (!B_FULL[c.id] && !busy && B.cjk && want((look.id === 'flat' ? .2 : look.under === undefined ? .5 : look.under) * (c.long ? .4 : 1))){
     const blur = maybe(.6) ? (look.ghost === undefined ? 5 : look.ghost) * R(.6, 1.6) * u : 0, col = P([pal.i, pal.i, B.kin]), al = (heavy ? R(.045, .08) : R(.07, .13)) * (blur > 4 ? 1.5 : 1) * (B.dark ? 1.15 : 1), l = B.layer('deco', { bleed: true, under: true, ...(blur ? { soft: blur } : {}) }), kind = P(['char', 'char', 'col', 'row', 'verse']);
     const body = B.layers.filter(q => q.role === 'body' || q.body).flatMap(q => q.ops.map(o => blindOpRect(B, o))).filter(Boolean), left = body.length ? body.reduce((s, r) => s + r.x + r.w / 2, 0) / body.length < W / 2 : maybe(.5);
@@ -4703,19 +4704,7 @@ function blindUnder(B, rng, c, rng2){
     else if (kind === 'row'){ const s = Math.min(W * R(1.15, 1.5) / B.emOf(ghost), H * .4); B.row(l, ghost, W * R(.4, .6), H * R(.2, .8), s, { c: col, a: al }); }
     else { const s = Math.min(W * .9 / B.emOf(ghost), H * .1), n = Math.ceil(H / (s * 1.16)), dx = R(-.5, .5) * s; for (let i = -1; i <= n; i++) B.row(l, ghost, W / 2 + dx * (i - n / 2), s * 1.16 * (i + .5), s, { c: col, a: al * (.45 + .55 * Math.abs(Math.sin(i * .7 + 1))) }); }
   }
-  // 没写题头出处日期的，边上也别空得像没做完：拿正文里的词当边注，很小
-  if (rng2) blindNote(B, rng2, key); else blindNote(B, rng, key);
-}
-function blindNote(B, { R, P, maybe }, key){
-  const { W, H, M, pal, u } = B;
-  if (!B.metaItems().length && B.cjk && B.N > 8 && maybe(.55)){
-    const z = R(14, 18) * u, l = B.layer('deco', { note: true }), soft = { c: pal.i, a: .72, f: 'meta' }, first = B.clauses[0], last = B.clauses[B.clauses.length - 1], cut = (us, n, end) => (end ? us.slice(-n) : us.slice(0, n)).map(q => ({ ...q, at: undefined })), y0 = M * .52, y1 = H - M * .52, gap = R(.1, .6), kind = P(['corner', 'corner', 'side', 'one', 'four']);
-    const put = (us, x, y, align) => B.row(l, us, x, y, z, { align, gap, ...soft });
-    if (kind === 'corner'){ put(cut(first.units, 4), M, y0, 'left'); put(cut(last.units, 4, true), W - M, y1, 'right'); }
-    else if (kind === 'one') put(cut(key, 6), P([M, M, W - M]) === M ? M : M, P([y0, y1]), 'left');
-    else if (kind === 'side'){ const us = cut(key, 8), n = B.colLen(us, 'meta', gap) * z, right = maybe(.5); B.col(l, us, right ? W - M * .46 : M * .46, P([M, H - M - n, (H - n) / 2]), z, { gap, ...soft }); }
-    else { const ws = [...key.slice(0, 4)], at = [[M, y0, 'left'], [W - M, y0, 'right'], [M, y1, 'left'], [W - M, y1, 'right']]; if (ws.length === 4) ws.forEach((w, i) => put([{ ...w, at: undefined }], ...at[i])); else put(cut(key, 4), M, y0, 'left'); }
-  }
+  // 🔒 没写题头、出处、日期，角落就空着（2026-11-25）：早先拿正文里的词填在边上，人家没要
 }
 
 // 淡的、软的香槟色，替掉暗底上的金 —— 金字是喜报，不是诗
@@ -4953,7 +4942,8 @@ function renderBlind(canvas, st, plan, idx){
   if (idx > 0) return renderPage(canvas, blind.innerSt, blind.inner, idx - 1);
   const { B, pal, sd } = blind, ctx = canvas.getContext('2d'), cache = new Map(), amt = { fx: 1, post: 1, ...((st.blind || {}).amt || {}) };
   if (canvas.width !== W * DPR || canvas.height !== H * DPR){ canvas.width = W * DPR; canvas.height = H * DPR; }      // 尺寸没变就别重新要一块
-  else { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+  else if (ctx.reset) ctx.reset();      // 连上一张留下的笔（平滑、线帽、字距）一起清，不然同一张重画两遍会差一点点
+  else { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low'; ctx.lineCap = 'butt'; ctx.lineJoin = 'miter'; ctx.miterLimit = 10; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, canvas.width, canvas.height); }
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   if (!st.noGround) blindGround(ctx, W, H, pal, st, 0, blind.look, sd);
   B.bare = !!st.noGround;
@@ -5196,16 +5186,21 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': '摘',
     'app.title': '拾 句',
-    'lang.toggle': '界面换成英文',
     'blind.amt_fx': '效果浓度', 'blind.amt_post': '修图浓度',
     'full.on': '全屏', 'full.off': '退出全屏', 'full.show': '面板', 'full.hide': '收起面板', 'full.title': '铺满整块屏，整张看得见',
     'theme.auto': '跟随', 'theme.day': '白天', 'theme.night': '黑夜',
     'tab.text': '文', 'tab.paper': '纸', 'tab.font': '字', 'tab.ink': '色', 'tab.layout': '版',
-    'act.save': '存 图', 'act.copy': '复制这张', 'act.close': '关闭',
+    'tab.comp': '方案', 'tab.look': '气氛', 'tab.pal': '颜色', 'tab.feel': '质感', 'tab.add': '添',
+    'mode.plain': '排信纸', 'mode.box': '拆盲盒', 'head.more': '更多', 'head.theme': '面板', 'head.lang': '语言', 'head.grab': '拉高、收起',
+    'blind.mineShort': '常用', 'blind.mineTitle': '常用版式', 'blind.mineNone': '还没有。拆到喜欢的，点海报底下那颗心。', 'blind.again1': '另掷一张', 'blind.amt': '浓度', 'blind.fourSub': '四样分开改', 'blind.addNow': '现在有的',
+    'blind.minePaper': '用我的纸', 'blind.mineInk': '用我的墨', 'blind.usePaper': '铺我选的这张', 'blind.useInk': '用我选的这支',
+    'blind.k_all': '全部', 'blind.k_air': '光和空气', 'blind.k_tex': '质地', 'blind.k_lens': '镜头', 'blind.k_word': '字的变化', 'blind.k_print': '印刷',
+    'blind.pal1_first': '最初', 'blind.pal1_cn': '中国', 'blind.pal1_jp': '日本', 'blind.pal1_intl': '国际',
+    'font.tBody': '正文', 'font.tTitle': '标题', 'font.tLatin': '西文', 'font.missFold': '还有 {n} 款没装', 'font.addFold': '加一款字：文件、字体包、链接', 'font.whose': '这张盲盒的字', 'font.mineOn': '用我选的', 'act.bareShort': '透明底',
+    'act.save': '存 图', 'act.copy': '复制', 'act.close': '关闭',
     'act.store': '存',
 
     // ── 通用小件（开关 / 字重 / 对齐 / 排向）──────────────────────
-    'sw.show': '显示', 'sw.hide': '隐藏',
     'weight.regular': '常', 'weight.medium': '中', 'weight.bold': '粗',
     'align.left': '左', 'align.center': '中', 'align.right': '右',
     'dir.horizontal': '横排', 'dir.vertical': '竖排',
@@ -5214,7 +5209,6 @@ const STUDIO_I18N = {
 
     // ── 文 ───────────────────────────────────────────────────────
     'text.title': '标题',
-    'text.sizeWeight': '字号 · 字重',
     'text.titlePh': '留空就没有标题',
     'text.body': '内容',
     // ── 版式盲盒 ─────────────────────────────────────────────────
@@ -5222,10 +5216,9 @@ const STUDIO_I18N = {
     'blind.openTitle': '随机一套字体海报式的排版。内容一个字不动，不喜欢就再拆。',
     'blind.prev': '上一个', 'blind.next': '下一个',
     'blind.keep': '存为常用', 'blind.keepTitle': '存成常用版式：以后换一段字，一点就照这样排',
-    'blind.off': '合上盲盒',
-    'blind.lock': '用我的', 'blind.paper': '纸', 'blind.font': '字', 'blind.ink': '墨',
    
-    'blind.edit': '改一改', 'tab.box': '盒',
+   
+   
     'blind.editHint': '在纸上点中什么就能拖着走；右下角的圆点放大、转动，右上角的叉删掉。字块也能拖。',
     'blind.undo': '撤一步', 'blind.redo': '重做',
     'blind.reroll': '别的不动，只重掷这一样',
@@ -5237,14 +5230,14 @@ const STUDIO_I18N = {
     'blind.compNo': '这段字排不进「{name}」，先给你换了一种。',
     'blind.cg': '底', 'blind.ci': '墨', 'blind.ca': '点睛', 'blind.cb': '副色',
     'blind.none': '都不要',
-    'blind.pal_first': '最初', 'bl.first': '最初', 'bc.full': '满排', 'bc.stars': '散星', 'blind.pal_cn': '中国传统色', 'blind.pal_jp': '和田三造与日本传统色', 'blind.pal_intl': '国际与现代', 'blind.tune': '按配色理论现调一套', 'blind.tuned': '现调',
-    'blind.s_comp': '方案', 'blind.s_pal': '颜色', 'blind.s_fx': '字上的效果', 'blind.s_post': '修图', 'blind.s_add': '自己加图形和线',
+    'bl.first': '最初', 'bc.full': '满排', 'bc.stars': '散星', 'blind.tune': '按配色理论现调一套',
+    'blind.s_fx': '字上的效果', 'blind.s_post': '修图',
     'blind.q_quiet': '低声', 'blind.q_image': '字即图形', 'blind.q_loud': '响亮', 'blind.more': '更多',
     'blind.g_line': '线', 'blind.g_shape': '形状', 'blind.g_light': '光', 'blind.g_cover': '遮盖', 'blind.g_pane': '玻璃与马赛克',
     'blind.f_line': '单线', 'blind.f_yarn': '毛线', 'blind.m_sweep': '一笔', 'blind.m_coil': '打圈', 'blind.m_tie': '系住两个字', 'blind.m_orbit': '环绕',
     'blind.l_deco': '淡字',
-    'act.bare': '透明底（存成 PNG）', 'sw.on': '要', 'sw.off': '不要',
-    'blind.kept': '存好了：「{name}」。换一段字，点上面的「常用版式」就照它排；双击改名。',
+    'act.bare': '透明底（存成 PNG）',
+    'blind.kept': '存好了：「{name}」。换一段字，点上头的「♡ 常用」就照它排。',
     'blind.empty': '先写点字，才好拆。',
     'blind.coverNote': '字多，第一张是封面，全文在后面 {n} 张',
     'bc.banner': '横幅',
@@ -5288,9 +5281,9 @@ const STUDIO_I18N = {
     'bl.negative': '负片',
     'bl.subtitle': '字幕',
     'bl.flat': '平涂',
-    'blind.s_look': '气氛', 'blind.re_look': '气氛', 'blind.re_post': '修图', 'blind.q_warm': '有体温', 'blind.q_long': '长文',
+    'blind.re_look': '气氛', 'blind.re_post': '修图', 'blind.q_warm': '有体温', 'blind.q_long': '长文',
     'bc.folio': '一页书', 'bc.hung': '悬栏', 'bc.tiers': '段组', 'bc.theme': '主句', 'bc.voices': '两个声音', 'bc.center': '中轴', 'bc.initial': '首字', 'bc.cascade': '递降', 'bc.develop': '显影', 'bc.steps2': '错段', 'bc.aside': '边注', 'bc.silence': '静', 'bc.ledger': '条目', 'bc.swell': '起潮', 'bc.strophe': '分行',
-    'blind.mine': '常用版式 {n}', 'blind.mineUse': '照这个版式排现在这段字。双击改名。',
+    'blind.mineUse': '照这个版式排现在这段字。双击改名。',
     'bc.block': '满版', 'bc.vblock': '竖满版', 'bc.pack': '回旋', 'bc.steps': '骰子', 'bc.rain': '雨', 'bc.field': '字场',
     'bc.path': '一笔', 'bc.inline': '句中', 'bc.swiss': '网格', 'bc.pillar': '立柱', 'bc.skyline': '天际线', 'bc.ramp': '变奏',
     'bc.contour': '等高线', 'bc.overprint': '叠印', 'bc.cut': '错切', 'bc.shutter': '交错', 'bc.melt': '渐糊', 'bc.slit': '狭缝', 'bc.micro': '字中字',
@@ -5364,9 +5357,8 @@ const STUDIO_I18N = {
     'paper.autoInkSwapped': '这张纸太浓，黑字看不清，墨色替你换成了「{name}」——不喜欢就自己再挑。',
 
     // ── 字 ───────────────────────────────────────────────────────
-    'font.body': '正文字体',
-    'font.latin': '西文字体（只管字母和数字）',
-    'font.title': '标题字体',
+   
+   
     'font.sameAsBody': '同正文',
     'font.noneLatin': '不指定（跟着中文字体走）',
     'font.hintMissing': '没装',
@@ -5420,7 +5412,7 @@ const STUDIO_I18N = {
     'layout.pages': '拆成几张',
     'layout.pagesAuto': '自动',
     'layout.offset': '整块位移',
-    'layout.offsetHint': '在右边预览图上直接拖',
+    'layout.offsetHint': '在预览图上直接拖',
     'layout.offsetVal': '左右 {x} · 上下 {y}',
     'layout.offsetNone': '没挪过',
     'layout.offsetReset': '归位',
@@ -5465,16 +5457,21 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': 'Clip',
     'app.title': 'Shiju',
-    'lang.toggle': 'Switch the interface to Chinese',
     'blind.amt_fx': 'Effect', 'blind.amt_post': 'Finish',
     'full.on': 'Full screen', 'full.off': 'Exit full screen', 'full.show': 'Panel', 'full.hide': 'Hide panel', 'full.title': 'Fill the screen and see the whole sheet',
     'theme.auto': 'System', 'theme.day': 'Day', 'theme.night': 'Night',
     'tab.text': 'Text', 'tab.paper': 'Paper', 'tab.font': 'Type', 'tab.ink': 'Ink', 'tab.layout': 'Layout',
-    'act.save': 'Save', 'act.copy': 'Copy this one', 'act.close': 'Close',
+    'tab.comp': 'Form', 'tab.look': 'Mood', 'tab.pal': 'Colour', 'tab.feel': 'Feel', 'tab.add': 'Add',
+    'mode.plain': 'Letter', 'mode.box': 'Blind box', 'head.more': 'More', 'head.theme': 'Panel', 'head.lang': 'Language', 'head.grab': 'Raise or lower',
+    'blind.mineShort': 'Saved', 'blind.mineTitle': 'Saved layouts', 'blind.mineNone': 'None yet. When you like one, tap the heart under the sheet.', 'blind.again1': 'Another', 'blind.amt': 'Amount', 'blind.fourSub': 'One colour at a time', 'blind.addNow': 'On the sheet',
+    'blind.minePaper': 'My paper', 'blind.mineInk': 'My ink', 'blind.usePaper': 'Use the chosen paper', 'blind.useInk': 'Use the chosen ink',
+    'blind.k_all': 'All', 'blind.k_air': 'Light and air', 'blind.k_tex': 'Texture', 'blind.k_lens': 'Lens', 'blind.k_word': 'Letters', 'blind.k_print': 'Print',
+    'blind.pal1_first': 'First', 'blind.pal1_cn': 'Chinese', 'blind.pal1_jp': 'Japanese', 'blind.pal1_intl': 'International',
+    'font.tBody': 'Body', 'font.tTitle': 'Title', 'font.tLatin': 'Latin', 'font.missFold': '{n} not installed', 'font.addFold': 'Add a font: file, zip or link', 'font.whose': 'Fonts of this box', 'font.mineOn': 'Use mine', 'act.bareShort': 'Transparent',
+    'act.save': 'Save', 'act.copy': 'Copy', 'act.close': 'Close',
     'act.store': 'Save',
 
     // ── 通用小件（开关 / 字重 / 对齐 / 排向）──────────────────────
-    'sw.show': 'Show', 'sw.hide': 'Hide',
     'weight.regular': 'Regular', 'weight.medium': 'Medium', 'weight.bold': 'Bold',
     'align.left': 'Left', 'align.center': 'Center', 'align.right': 'Right',
     'dir.horizontal': 'Horizontal', 'dir.vertical': 'Vertical',
@@ -5483,7 +5480,6 @@ const STUDIO_I18N = {
 
     // ── 文 ───────────────────────────────────────────────────────
     'text.title': 'Title',
-    'text.sizeWeight': 'Size · weight',
     'text.titlePh': 'Leave empty for no title',
     'text.body': 'Body',
     // ── blind box ────────────────────────────────────────────────
@@ -5491,10 +5487,9 @@ const STUDIO_I18N = {
     'blind.openTitle': 'A random poster-style layout. Your words stay as they are; do not like it, open another.',
     'blind.prev': 'Previous', 'blind.next': 'Next',
     'blind.keep': 'Save layout', 'blind.keepTitle': 'Save it as one of your layouts and reuse it on any text',
-    'blind.off': 'Close the box',
-    'blind.lock': 'Use my', 'blind.paper': 'paper', 'blind.font': 'font', 'blind.ink': 'ink',
    
-    'blind.edit': 'Edit', 'tab.box': 'Box',
+   
+   
     'blind.editHint': 'Click anything on the sheet and drag it; the corner dot scales and turns it, the cross removes it. Text blocks move too.',
     'blind.undo': 'Undo', 'blind.redo': 'Redo',
     'blind.reroll': 'Re-roll only this, keep the rest',
@@ -5506,14 +5501,14 @@ const STUDIO_I18N = {
     'blind.compNo': 'This text does not fit “{name}”, so another layout was used.',
     'blind.cg': 'ground', 'blind.ci': 'ink', 'blind.ca': 'accent', 'blind.cb': 'second',
     'blind.none': 'None',
-    'blind.pal_first': 'The first ones', 'bl.first': 'The first', 'bc.full': 'Justified', 'bc.stars': 'Stars', 'blind.pal_cn': 'Traditional Chinese', 'blind.pal_jp': 'Sanzo Wada and traditional Japanese', 'blind.pal_intl': 'International and modern', 'blind.tune': 'Mix one by colour theory', 'blind.tuned': 'mixed',
-    'blind.s_comp': 'Layout', 'blind.s_pal': 'Colours', 'blind.s_fx': 'Effects on the text', 'blind.s_post': 'Retouch', 'blind.s_add': 'Add shapes yourself',
+    'bl.first': 'The first', 'bc.full': 'Justified', 'bc.stars': 'Stars', 'blind.tune': 'Mix one by colour theory',
+    'blind.s_fx': 'Effects on the text', 'blind.s_post': 'Retouch',
     'blind.q_quiet': 'Quiet', 'blind.q_image': 'Words as images', 'blind.q_loud': 'Loud', 'blind.more': 'More',
     'blind.g_line': 'Lines', 'blind.g_shape': 'Shapes', 'blind.g_light': 'Light', 'blind.g_cover': 'Covers', 'blind.g_pane': 'Glass and mosaic',
     'blind.f_line': 'plain', 'blind.f_yarn': 'yarn', 'blind.m_sweep': 'one sweep', 'blind.m_coil': 'coil', 'blind.m_tie': 'tie two words', 'blind.m_orbit': 'orbit',
     'blind.l_deco': 'Faint text',
-    'act.bare': 'Transparent (PNG)', 'sw.on': 'On', 'sw.off': 'Off',
-    'blind.kept': 'Saved “{name}”. Open “My layouts” above to use it on any text; double-click renames.',
+    'act.bare': 'Transparent (PNG)',
+    'blind.kept': 'Saved “{name}”. Open ♡ Saved above to use it on any text.',
     'blind.empty': 'Write something first.',
     'blind.coverNote': 'long text: page 1 is a cover, the full text follows on {n} page(s)',
     'bc.banner': 'Banner',
@@ -5557,9 +5552,9 @@ const STUDIO_I18N = {
     'bl.negative': 'Negative',
     'bl.subtitle': 'Subtitles',
     'bl.flat': 'Flat',
-    'blind.s_look': 'Atmosphere', 'blind.re_look': 'atmosphere', 'blind.re_post': 'finish', 'blind.q_warm': 'Warm', 'blind.q_long': 'Long text',
+    'blind.re_look': 'atmosphere', 'blind.re_post': 'finish', 'blind.q_warm': 'Warm', 'blind.q_long': 'Long text',
     'bc.folio': 'Folio', 'bc.hung': 'Hung columns', 'bc.tiers': 'Tiers', 'bc.theme': 'Theme line', 'bc.voices': 'Two voices', 'bc.center': 'Centre line', 'bc.initial': 'Initial', 'bc.cascade': 'Cascade', 'bc.develop': 'Developing', 'bc.steps2': 'Stepped', 'bc.aside': 'Marginalia', 'bc.silence': 'Silence', 'bc.ledger': 'Ledger', 'bc.swell': 'Swell', 'bc.strophe': 'Strophes',
-    'blind.mine': 'My layouts {n}', 'blind.mineUse': 'Lay out the current text this way. Double-click to rename.',
+    'blind.mineUse': 'Lay out the current text this way. Double-click to rename.',
     'bc.block': 'Full block', 'bc.vblock': 'Vertical block', 'bc.pack': 'Packed', 'bc.steps': 'Dice', 'bc.rain': 'Rain', 'bc.field': 'Field',
     'bc.path': 'One stroke', 'bc.inline': 'Mid-sentence', 'bc.swiss': 'Grid', 'bc.pillar': 'Pillar', 'bc.skyline': 'Skyline', 'bc.ramp': 'Variation',
     'bc.contour': 'Contours', 'bc.overprint': 'Overprint', 'bc.cut': 'Offset cut', 'bc.shutter': 'Shutter', 'bc.melt': 'Melt', 'bc.slit': 'Slit scan', 'bc.micro': 'Words in a word',
@@ -5633,9 +5628,8 @@ const STUDIO_I18N = {
     'paper.autoInkSwapped': 'This paper is too dark for black text, so the ink was switched to “{name}” — pick another if you prefer.',
 
     // ── 字 ───────────────────────────────────────────────────────
-    'font.body': 'Body font',
-    'font.latin': 'Latin font (letters and digits only)',
-    'font.title': 'Title font',
+   
+   
     'font.sameAsBody': 'Same as body',
     'font.noneLatin': 'None (follow the Chinese font)',
     'font.hintMissing': 'missing',
@@ -5792,8 +5786,8 @@ const PICK_CSS = `
 .pkf span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pkf i{font-style:normal;font-size:10px;color:var(--dim)}
 .pick .flist{margin-top:4px;max-height:216px;overflow:auto;overscroll-behavior:contain}
-.pkhint{font-size:10px;color:var(--dim);margin:5px 0 0;line-height:1.5}
-.pkhint button{border:0;background:transparent;color:var(--fg);font-size:10px;text-decoration:underline;cursor:pointer;padding:0 0 0 4px}
+.pkhint{font-size:11px;color:var(--dim);margin:5px 0 0;line-height:1.5}
+.pkhint button{border:0;background:transparent;color:var(--fg);font-size:11px;text-decoration:underline;cursor:pointer;padding:0 0 0 4px}
 @media (max-width: 760px){
   .pkinks button{width:28px;height:28px}
   .pkinks button.same{height:30px;padding:0 10px}
@@ -6031,49 +6025,30 @@ function mountPick({ mask, st, draw, alive, fillFonts }){
 //  6c. 版式盲盒的界面：按钮条（常驻在预览上方）＋「盒」那一屏（接着改）＋ 纸上直接拖
 // ════════════════════════════════════════════════════════════════════
 const BLIND_CSS = `
-.bbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:0 0 auto}
-.bbar [hidden],.tabs [hidden],.bx [hidden]{display:none!important}
-.bbar button{border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;
-     font-size:12px;padding:6px 13px;cursor:pointer;letter-spacing:.06em}
-.bbar button.go{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg);padding:7px 18px;letter-spacing:.14em}
-.bbar button.ic{padding:6px 11px}
-.bbar button:disabled,.bx button:disabled{opacity:.35;cursor:default}
-.bbar .kept{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:5px;max-height:92px;overflow:auto}
-.bbar .kept span{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--btn)}
-.bbar .kept button{border:0;border-radius:0;padding:4px 4px 4px 11px;font-size:11px}
-.bbar .kept button+button{padding:4px 9px 4px 5px;color:var(--dim)}
-.bbar .nm{;color:var(--fg);letter-spacing:.06em;margin:0 4px;min-width:0}
-.bx .acc{border-top:1px solid var(--line);margin-top:0}
-.bx .acc:first-of-type{margin-top:12px}
-.bx .acc:last-of-type{border-bottom:1px solid var(--line)}
-.bx summary{cursor:pointer;list-style:none;padding:10px 2px;font-size:12px;color:var(--fg);letter-spacing:.06em;display:flex;gap:8px;align-items:baseline}
-.bx summary::-webkit-details-marker{display:none}
-.bx summary::after{content:'+';margin-left:auto;color:var(--dim)}
-.bx .acc[open] summary::after{content:'–'}
-.bx summary em{font-style:normal;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.bx .accin{padding:0 0 12px}
-.bx .chips{display:flex;flex-wrap:wrap;gap:4px}
-.bx .chips button{border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;font-size:11px;padding:3px 9px;cursor:pointer}
-.bx .chips button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg)}
-.bx .chips button.re::before{content:"↻ ";color:var(--dim)}
-.bx .pals{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
-.bx .pals button{height:24px;padding:0;border:1px solid var(--line);border-radius:4px;cursor:pointer;overflow:hidden;display:flex}
-.bx .pals button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
-.bx .pals i{flex:1;height:100%}
-.bx .four{display:flex;gap:10px;margin-top:7px;font-size:11px;color:var(--dim)}
-.bx .four span{display:flex;gap:4px;align-items:center}
-.bx input[type=color]{width:26px;height:22px;padding:0;border:1px solid var(--line);border-radius:3px;background:var(--btn);cursor:pointer}
-.bx .one{border:1px solid var(--on-bg);border-radius:5px;padding:9px;background:var(--field);margin-top:7px}
-.bx .one .fs{margin-top:5px;font-size:11px;color:var(--dim)}
-.bx .one .fs span{flex:0 0 34px}
-.bx .amts{margin-top:10px}
-.bx .amts .fs{margin-top:4px;font-size:11px;color:var(--dim)}
-.bx .amts .fs>span:first-child{flex:0 0 62px}
-.bx .dots{display:flex;gap:6px;align-items:center;margin-top:7px}
-.bx .dots button{width:20px;height:20px;border-radius:50%;border:1px solid rgba(128,128,128,.4);padding:0;cursor:pointer}
-.bx .dots button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
-.bx .two{display:flex;gap:5px}
-.bx .two button{flex:1;border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:4px;font-size:12px;padding:6px 4px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.chips button{border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;font-size:12px;padding:4px 11px;cursor:pointer}
+.chips button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg)}
+.chips button.re::before{content:"↻ ";color:var(--dim)}
+.chips .bre,.chips .bLock{display:contents}
+.bsec{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--fg);margin:0 0 4px;letter-spacing:.04em}
+.bsec:not(:first-child){margin-top:24px}
+.bsec .chips button{font-size:11px;padding:3px 9px}
+.amts.fs{margin:4px 0 12px;font-size:12px;color:var(--dim)}
+.pals{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.pals button{height:32px;padding:0;border:1px solid var(--line);border-radius:5px;cursor:pointer;overflow:hidden;display:flex}
+.pals button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
+.pals i{flex:1;height:100%}
+.four{display:flex;gap:14px;font-size:12px;color:var(--dim)}
+.four span{display:flex;gap:5px;align-items:center}
+.four input,.dots input{width:28px;height:24px;padding:0;border:1px solid var(--line);border-radius:3px;background:var(--btn);cursor:pointer}
+.one{border:1px solid var(--on-bg);border-radius:6px;padding:10px;background:var(--field);margin:2px 0 16px}
+.one .fs{margin-top:5px;font-size:11px;color:var(--dim)}
+.one .fs span{flex:0 0 34px}
+.dots{display:flex;gap:6px;align-items:center;margin-top:7px}
+.dots button{width:20px;height:20px;border-radius:50%;border:1px solid rgba(128,128,128,.4);padding:0;cursor:pointer}
+.dots button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
+.two{display:flex;gap:5px}
+.two button{flex:1;border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:4px;font-size:12px;padding:6px 4px;cursor:pointer}
 .bov{position:absolute;inset:0;outline:none}
 .bsel{position:absolute;border:1.5px dashed #fff;box-shadow:0 0 0 1.5px rgba(185,32,11,.8);pointer-events:none;border-radius:3px}
 .bsel i,.bsel u{position:absolute;pointer-events:auto;width:18px;height:18px;border-radius:50%;background:#fff;border:1px solid rgba(185,32,11,.85);
@@ -6082,36 +6057,20 @@ const BLIND_CSS = `
 .bsel u{right:-9px;top:-9px;cursor:pointer}
 @media (pointer: coarse){ .bov{pointer-events:none} .mask.bedit .bov{pointer-events:auto;touch-action:none} .bsel i,.bsel u{width:26px;height:26px;line-height:24px} }
 @media (max-width: 760px){
-  .bbar{gap:4px}
-  .bbar button{padding:9px 9px;letter-spacing:0}
-  .bbar button.go{padding:10px 14px;letter-spacing:.06em}
-  .bbar .nm{flex:1 1 100%;order:5}
-  .mask.blind .view{max-height:62%}
-  .bx .chips button{padding:8px 12px;font-size:12px}
-  .bx .pals button{height:32px}
+  .chips button{padding:8px 13px}
+  .pals button{height:38px}
+  .dots button{width:28px;height:28px}
 }
 `;
-const blindHtml = () => `
-  <div class="bbar" id="bbar">
-    <button class="go" id="bGo" title="${t('blind.openTitle')}">${t('blind.open')}</button>
-    <button class="ic" id="bPrev" title="${t('blind.prev')}" aria-label="${t('blind.prev')}" hidden>‹</button>
-    <button class="ic" id="bNext" title="${t('blind.next')}" aria-label="${t('blind.next')}" hidden>›</button>
-    <button id="bEdit" hidden>${t('blind.edit')}</button>
-    <button id="bKeep" title="${t('blind.keepTitle')}" hidden>${t('blind.keep')}</button>
-    <button id="bOff" hidden>${t('blind.off')}</button>
-    <button id="bMine" aria-expanded="false" hidden></button>
-    <span class="nm" id="bName" hidden></span>
-    <div class="kept" id="bKept" hidden></div>
-  </div>`;
 // 方案分三堆：低声的、意象、响亮的
 const B_COMP_GROUPS = () => [['quiet', BLIND_COMPS.filter(c => c.q && !c.g && c.id !== 'image' && c.id !== 'youme')], ['warm', BLIND_MORE], ['long', BLIND_LONG], ['image', BLIND_COMPS.filter(c => c.id === 'image' || c.id === 'youme')], ['jp', BLIND_STYLE.filter(c => c.g === 'jp')], ['intl', BLIND_STYLE.filter(c => c.g === 'intl')], ['pop', BLIND_STYLE.filter(c => c.g === 'pop')], ['loud', BLIND_COMPS.filter(c => !c.q && !c.long && !c.g && !BLIND_MORE.includes(c))]];
-const bAcc = (k, inner) => `<details class="acc" data-k="${k}"><summary>${t('blind.s_' + k)}<em id="bNow_${k}"></em></summary><div class="accin">${inner}</div></details>`;
-const blindPaneHtml = () => `
-  <div class="pane bx" data-p="box">
-    <div class="two"><button id="bUndo">${t('blind.undo')}</button><button id="bRedo">${t('blind.redo')}</button></div>
-    <div class="sub">${t('blind.reroll')}</div><div class="chips" id="bRe"></div>
-    <div class="amts">${['fx', 'post'].map(k => `<div class="fs" data-k="${k}"><span>${t('blind.amt_' + k)}</span><input type="range" min="0" max="100" step="1" aria-label="${t('blind.amt_' + k)}"><span class="val"></span></div>`).join('')}</div>
-    <div class="one" id="bOne" hidden>
+// 气氛分几堆（跟 README 那张表一个分法）
+const B_LOOK_GROUPS = [['all', null], ['air', ['mist', 'afterglow', 'over', 'night', 'lamp', 'darkroom', 'neon', 'dive', 'gradient', 'pearl']], ['tex', ['first', 'watercolor', 'paper', 'press', 'film', 'sandblast', 'signal']], ['lens', ['swirl', 'long', 'glass', 'negative', 'subtitle']], ['word', ['vanish', 'cover', 'flat']], ['print', ['bokashi', 'benday']]];
+const bRe = ks => `<span class="bre" data-ks="${ks}"></span>`;
+const bAmt = k => `<div class="fs amts" data-k="${k}"><span>${t('blind.amt')}</span><input type="range" min="0" max="100" step="1" aria-label="${t('blind.amt_' + k)}"><span class="val"></span></div>`;
+// 在纸上点中的那一块：哪一屏都在最上头
+const blindOneHtml = () => `
+    <div class="bx"><div class="one" id="bOne" hidden>
       <div class="pkh"><b id="bOneName"></b><button id="bOneDel">${t('blind.del')}</button></div>
       <div id="bSwapBox"><div class="chips" id="bSwap"></div></div>
       <div id="bLineBox"><div class="chips" id="bFeel"></div><div class="chips" id="bMode" style="margin-top:4px"></div></div>
@@ -6121,20 +6080,28 @@ const blindPaneHtml = () => `
       <div class="fs" data-k="rot"><span>${t('blind.turn')}</span><input type="range" min="-180" max="180" step="1"></div>
       <div class="fs" data-k="t"><span>${t('blind.thick')}</span><input type="range" min="1" max="100" step="1"></div>
       <div class="two" style="margin-top:8px"><button id="bFront"></button><button id="bReseed">${t('blind.reseed')}</button><button id="bDup">${t('blind.dup')}</button></div>
-    </div>
-    <p class="pkhint" id="bTip">${t('blind.editHint')}</p>
-    ${bAcc('comp', '<div id="bComp"></div>')}
-    ${bAcc('look', '<div class="chips" id="bLook"></div>')}
-    ${bAcc('pal', `<div class="two"><button id="bTune">${t('blind.tune')}</button></div>
-      <div class="four" id="bFour">${['g', 'i', 'a', 'b'].map(k => `<span><input type="color" data-k="${k}">${t('blind.c' + k)}</span>`).join('')}</div>
-      <div id="bPals"></div>
-      <div class="sub">${t('blind.lock')}</div><div class="chips" id="bLock"><button data-k="paper">${t('blind.paper')}</button><button data-k="font">${t('blind.font')}</button><button data-k="ink">${t('blind.ink')}</button></div>`)}
-    ${bAcc('fx', `<div class="chips" id="bFx"></div><div class="sub">${t('blind.more')}</div><div class="chips" id="bFx2"></div>`)}
-    ${bAcc('post', '<div class="chips" id="bPost"></div>')}
-    ${bAcc('add', `<div class="chips" id="bItems"></div><div id="bAdd"></div>`)}
-  </div>`;
+    </div></div>`;
+const blindPaneHtml = () => `
+  <div class="pane bx" data-p="comp"><div class="gs" id="bCompG"></div><div class="th" id="bComp"></div>
+    <div class="sub" style="margin-top:20px">${t('blind.reroll')}</div><div class="chips">${bRe('hero')}</div><p class="pkhint" id="bTip">${t('blind.editHint')}</p></div>
+  <div class="pane bx" data-p="look"><div class="gs" id="bLookG"></div><div class="th" id="bLook"></div></div>
+  <div class="pane bx" data-p="pal">
+    <div class="chips" style="margin-bottom:14px">${bRe('pal')}<button id="bTune">${t('blind.tune')}</button></div>
+    <div class="gs" id="bPalG"></div><div class="pals" id="bPals"></div>
+    <div class="sub" style="margin-top:18px">${t('blind.fourSub')}</div>
+    <div class="four" id="bFour">${['g', 'i', 'a', 'b'].map(k => `<span><input type="color" data-k="${k}">${t('blind.c' + k)}</span>`).join('')}</div>
+    <details class="fold" style="margin-top:20px"><summary>${t('blind.minePaper')}</summary><div class="chips bLock" style="display:flex"><button data-k="paper">${t('blind.usePaper')}</button></div><div id="palPaper"></div></details>
+    <details class="fold" style="margin-top:0"><summary>${t('blind.mineInk')}</summary><div class="chips bLock" style="display:flex"><button data-k="ink">${t('blind.useInk')}</button></div><div id="palInk"></div></details>
+  </div>
+  <div class="pane bx" data-p="feel">
+    <div class="bsec"><span>${t('blind.s_fx')}</span><span class="chips">${bRe('fx')}</span></div>${bAmt('fx')}
+    <div class="chips" id="bFx"></div><details class="fold"><summary>${t('blind.more')}</summary><div class="chips" id="bFx2"></div></details>
+    <div class="bsec"><span>${t('blind.s_post')}</span><span class="chips">${bRe('post')}</span></div>${bAmt('post')}
+    <div class="chips" id="bPost"></div>
+  </div>
+  <div class="pane bx" data-p="add"><div class="sub" style="margin-top:0">${t('blind.addNow')}</div><div class="chips" id="bItems"></div><div id="bAdd"></div></div>`;
 
-function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab, ready }){
+function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, tab, keptOpen, shutPops, typing }){
   const q = s => mask.querySelector(s);
   // 一个盒子 ＝ 它自己的一串改动；盒子之间前后翻，盒子里头一步一步撤
   const boxes = resume ? resume.boxes : []; let at = resume ? resume.at : -1, plan = null, sel = null, name = '', short = '', label = '', lookNow = '';
@@ -6183,35 +6150,35 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
   q('#bNext').onclick = () => { if (at < boxes.length - 1) jump(at + 1); };
   q('#bUndo').onclick = () => { const b = box(); if (b && b.i > 0){ b.i--; st.blind = b.hist[b.i]; lastTag = ''; apply(); } };
   q('#bRedo').onclick = () => { const b = box(); if (b && b.i < b.hist.length - 1){ b.i++; st.blind = b.hist[b.i]; lastTag = ''; apply(); } };
-  q('#bOff').onclick = () => { undress(); st.blind = null; sel = null; apply(); };
-  q('#bEdit').onclick = () => openTab('box');
+  // 换模式：回信纸不丢盒子，再进来还是刚才那一个
+  const off = () => { undress(); st.blind = null; sel = null; apply(); };
+  const on = () => { if (at >= 0 && boxes[at] && (q('#t').value.trim() || q('#ti').value.trim())) jump(at); else q('#bGo').onclick(); };
   // 常用版式：收下的时候把颜色也定死，以后换一段字、换一个版本，都还是它
-  let open = !!(resume && resume.open);
   const frozen = () => {
     const p = plan.blind, { cls, canon, big, hero, heroW, body, bodyW, meta, metaW } = p.fonts, own = st.blind.own || {};
     return { ...st.blind, pal: { ...p.pal }, keep: { turn: p.turn, room: p.room, ...(own.font ? {} : { face: { cls, canon, big, hero, heroW, body, bodyW, meta, metaW } }) } };
   };
   const setOf = p => { const s = {}; for (const k of ['orient', 'showHeader', 'showSource', 'showDate'].concat((p.style.blind.own || {}).font ? ['font', 'latinFont', 'titleFont'] : [])) if (k in p.style) s[k] = p.style[k]; return s; };
-  q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, frozen()); open = true; fillKept(); tip(t('blind.kept', { name: n })); };
+  q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, frozen()); fillKept(); tip(t('blind.kept', { name: n })); };
+  let keptStamp = null;
   function fillKept(){
-    const list = kept.list(), box = q('#bKept'); box.textContent = ''; q('#bMine').hidden = !list.length; box.hidden = !list.length || !open;
-    q('#bMine').textContent = t('blind.mine', { n: list.length }); q('#bMine').setAttribute('aria-expanded', open && !!list.length);
-    for (const p of list){
-      const s = document.createElement('span'), b = document.createElement('button'), x = document.createElement('button');
-      b.textContent = p.name; b.title = t('blind.mineUse'); x.textContent = '×'; x.title = t('blind.del'); x.setAttribute('aria-label', t('blind.del')); s.append(b, x); box.append(s);
-      b.onclick = () => { const { text, title } = texts(); if (!(text.trim() || title.trim())){ tip(t('blind.empty')); return; } const set = setOf(p); dress(set); st.blind = blindFor({ ...p.style.blind }, text, title); sel = null; boxes.push({ hist: [st.blind], i: 0, set }); at = boxes.length - 1; lastTag = ''; apply(); if (plan && plan.blind && p.style.blind.comp && plan.blind.comp !== p.style.blind.comp) tip(t('blind.compNo', { name: t('bc.' + p.style.blind.comp) })); };
-      b.ondblclick = () => { const v = prompt(t('preset.renamePrompt'), p.name); if (v === null) return; kept.rename(p.id, v.trim().slice(0, 24) || p.name); fillKept(); };
-      x.onclick = () => { if (!confirm(t('preset.deleteConfirm', { name: p.name }))) return; kept.remove(p.id); fillKept(); };
+    const list = kept.list(), stamp = list.map(p => p.id + p.name).join(); if (stamp === keptStamp) return; keptStamp = stamp;
+    const box = q('#bKept'); box.textContent = ''; q('#bKeptNone').hidden = !!list.length;
+    for (const p of list.slice().reverse()){
+      const d = document.createElement('div'), b = document.createElement('button'), x = document.createElement('button');
+      d.className = 'ti'; d.dataset.id = p.id; b.append(document.createElement('canvas'), document.createTextNode(p.name)); b.title = t('blind.mineUse'); x.className = 'x'; x.textContent = '×'; x.title = t('blind.del'); x.setAttribute('aria-label', t('blind.del')); d.append(b, x); box.append(d);
+      b.onclick = () => { const { text, title } = texts(); if (!(text.trim() || title.trim())){ tip(t('blind.empty')); return; } const set = setOf(p); dress(set); st.blind = blindFor({ ...p.style.blind }, text, title); sel = null; boxes.push({ hist: [st.blind], i: 0, set }); at = boxes.length - 1; lastTag = ''; shutPops(); apply(); if (plan && plan.blind && p.style.blind.comp && plan.blind.comp !== p.style.blind.comp) tip(t('blind.compNo', { name: t('bc.' + p.style.blind.comp) })); };
+      b.ondblclick = () => { const v = prompt(t('preset.renamePrompt'), p.name); if (v === null) return; kept.rename(p.id, v.trim().slice(0, 24) || p.name); fillKept(); thumbs(); };
+      x.onclick = () => { if (!confirm(t('preset.deleteConfirm', { name: p.name }))) return; kept.remove(p.id); fillKept(); thumbs(); };
     }
   }
-  q('#bMine').onclick = () => { open = !open; fillKept(); };
 
   // ── 单换一样 ────────────────────────────────────────────────────
-  for (const k of ['comp', 'look', 'pal', 'font', 'hero', 'fx', 'post']){
-    const b = document.createElement('button'); b.className = 're'; b.dataset.k = k; b.textContent = t('blind.re_' + k); q('#bRe').append(b);
-  }
-  q('#bRe').onclick = e => {
-    const b = e.target.closest('button'); if (!b || !st.blind) return;
+  mask.querySelectorAll('.bre').forEach(box => { for (const k of box.dataset.ks.split(',')){
+    const b = document.createElement('button'); b.className = 're'; b.dataset.k = k; b.textContent = t('blind.re_' + k); b.onclick = () => reroll(b); box.append(b);
+  } });
+  const reroll = b => {
+    if (!st.blind) return;
     const k = b.dataset.k, patch = { seeds: { ...(st.blind.seeds || {}), [k]: blindSeed() } };
     // 重掷某一样，就把人在这一样上定死的放开
     if (k === 'comp') Object.assign(patch, { comp: undefined, move: undefined, keep: undefined });
@@ -6226,7 +6193,7 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
 
   // ── 浓淡：效果（字上的）和修图（整张的）各一根 ──────────────────
   let amtWait = 0;
-  mask.querySelectorAll('.bx .amts input').forEach(inp => inp.oninput = () => {
+  mask.querySelectorAll('.amts input').forEach(inp => inp.oninput = () => {
     const k = inp.parentElement.dataset.k, v = +inp.value / 100; inp.nextElementSibling.textContent = inp.value + '%';
     if (!st.blind) return;
     const amt = { fx: 1, post: 1, ...(st.blind.amt || {}), [k]: v }; set({ amt }, 'amt' + k); lastAt = Date.now(); setCfg('blindAmt', amt.fx >= 1 && amt.post >= 1 ? null : amt);
@@ -6273,22 +6240,31 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
   const moveLayer = (i, patch, tag) => go({ move: { ...(st.blind.move || {}), [i]: { ...((st.blind.move || {})[i] || {}), ...patch } } }, tag);
 
   // ── 构图 / 配色 / 用我的 / 效果 / 修图 ──────────────────────────
-  for (const [g, cs] of B_COMP_GROUPS()){ const h = document.createElement('div'); h.className = 'sub'; h.textContent = t('blind.q_' + g); const r = document.createElement('div'); r.className = 'chips'; for (const c of cs) chip(r, c.id, t('bc.' + c.id)); q('#bComp').append(h, r); }
-  // 一次只摊开一栏
-  mask.querySelectorAll('.acc').forEach(d => d.addEventListener('toggle', () => { if (d.open) mask.querySelectorAll('.acc').forEach(o => { if (o !== d) o.open = false; }); }));
+  const groups = B_COMP_GROUPS(); let compG = 'warm', lookG = 'all';
+  const tabsOf = (sel, list, get, set) => { const box = q(sel); for (const [v, n] of list) chip(box, v, n); box.onclick = e => { const b = e.target.closest('button'); if (b) set(b.dataset.v); }; };
+  const mark = (sel, v) => q(sel).querySelectorAll('button').forEach(b => { const on = b.dataset.v === v; b.setAttribute('aria-pressed', String(on)); if (on) try { const p = b.parentElement; p.scrollLeft = Math.max(0, b.offsetLeft - p.clientWidth / 2 + b.offsetWidth / 2); } catch {} });
+  // 一格小图：头一格是「另掷一张」
+  const tile = (box, v, text) => { const d = document.createElement('div'), b = document.createElement('button'); d.className = 'ti'; b.dataset.v = v; if (v === 're'){ const s = document.createElement('span'); s.className = 're'; s.innerHTML = ICO.again; b.append(s); } else b.append(document.createElement('canvas')); b.append(document.createTextNode(text)); d.append(b); box.append(d); };
+  const buildComp = g => { compG = g; const box = q('#bComp'); box.textContent = ''; tile(box, 're', t('blind.again1')); for (const c of (groups.find(x => x[0] === g) || groups[0])[1]) tile(box, c.id, t('bc.' + c.id)); mark('#bCompG', g); if (label) press('#bComp', v => v === label); thumbs(); };
+  const buildLook = g => { lookG = g; const box = q('#bLook'); box.textContent = ''; tile(box, 're', t('blind.again1')); for (const k of (B_LOOK_GROUPS.find(x => x[0] === g)[1] || BLIND_LOOKS.map(k => k.id))) tile(box, k, t('bl.' + k)); mark('#bLookG', g); if (lookNow) press('#bLook', v => v === lookNow); thumbs(); };
+  tabsOf('#bCompG', groups.map(([g]) => [g, t('blind.q_' + g)]), () => compG, g => buildComp(g));
+  tabsOf('#bLookG', B_LOOK_GROUPS.map(([g]) => [g, t('blind.k_' + g)]), () => lookG, g => buildLook(g));
   q('#bComp').onclick = e => {
     const b = e.target.closest('button'); if (!b || !st.blind) return;
-    // 换一种方案：种子不动，换回来还是原来那张。点的就是正用着的那种，才另掷一张
-    const was = st.blind, again = plan && plan.blind && plan.blind.comp === b.dataset.v; set({ comp: b.dataset.v, move: undefined, ...(again ? { keep: undefined, seeds: { ...(was.seeds || {}), comp: blindSeed() } } : {}) });
+    // 换一种方案：种子不动，换回来还是原来那张。点的就是正用着的那种（或者「另掷一张」），才另掷
+    const was = st.blind, now = plan && plan.blind && plan.blind.comp, v = b.dataset.v === 're' ? now : b.dataset.v, again = v === now; if (!v) return;
+    set({ comp: v, move: undefined, ...(again ? { keep: undefined, seeds: { ...(was.seeds || {}), comp: blindSeed() } } : {}) });
     apply();
-    if (plan && plan.blind && plan.blind.comp !== b.dataset.v) tip(t('blind.compNo', { name: t('bc.' + b.dataset.v) }));
+    if (plan && plan.blind && plan.blind.comp !== v) tip(t('blind.compNo', { name: t('bc.' + v) }));
   };
-  for (const k of BLIND_LOOKS) chip(q('#bLook'), k.id, t('bl.' + k.id));
-  q('#bLook').onclick = e => { const b = e.target.closest('button'); if (b && st.blind){ const s = { ...(st.blind.seeds || {}) }; for (const k of ['look', 'fx', 'post']) s[k] = blindSeed(); go({ look: b.dataset.v, fx: undefined, post: undefined, seeds: s }); } };      // 点第二下：同一种气氛，换一张底
-  for (const src of ['first', 'cn', 'jp', 'intl']){
-    const h = document.createElement('div'); h.className = 'sub'; h.textContent = t('blind.pal_' + src); const r = document.createElement('div'); r.className = 'pals'; q('#bPals').append(h, r);
-    for (const p of B_PALETTES.filter(p => p.src === src)){ const b = chip(r, p.id, ''); b.title = p.name; for (const k of ['g', 'i', 'a', 'b']){ const i = document.createElement('i'); i.style.background = p[k]; if (k === 'g') i.style.flex = '2'; b.append(i); } }
-  }
+  q('#bLook').onclick = e => {
+    const b = e.target.closest('button'); if (!b || !st.blind) return;
+    const v = b.dataset.v === 're' ? lookNow : b.dataset.v, s = { ...(st.blind.seeds || {}) }; if (!v) return;
+    if (v === lookNow) for (const k of ['look', 'fx', 'post']) s[k] = blindSeed();      // 点第二下：同一种气氛，换一张底
+    go({ look: v, fx: undefined, post: undefined, seeds: s });
+  };
+  const buildPals = src => { const r = q('#bPals'); r.textContent = ''; for (const p of B_PALETTES.filter(p => p.src === src)){ const b = chip(r, p.id, ''); b.title = p.name; for (const k of ['g', 'i', 'a', 'b']){ const i = document.createElement('i'); i.style.background = p[k]; if (k === 'g') i.style.flex = '2'; b.append(i); } } mark('#bPalG', src); if (plan && plan.blind) press('#bPals', v => v === plan.blind.pal.id); };
+  tabsOf('#bPalG', ['first', 'cn', 'jp', 'intl'].map(g => [g, t('blind.pal1_' + g)]), null, g => buildPals(g));
   q('#bPals').onclick = e => { const b = e.target.closest('button'); if (b && st.blind) go({ pal: { ...B_PALETTES.find(p => p.id === b.dataset.v) } }); };
   q('#bTune').onclick = () => { if (st.blind) go({ pal: bTune(bRng(blindSeed()).rnd) }); };
   mask.querySelectorAll('#bFour input').forEach(inp => inp.oninput = () => {
@@ -6297,11 +6273,11 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     if (inp.dataset.k === 'g'){ pal.paper = undefined; pal.light = undefined; }      // 换了底色，就不再铺那张纸
     go({ pal }, 'pal' + inp.dataset.k);
   });
-  q('#bLock').onclick = e => {
+  mask.querySelectorAll('.bLock').forEach(box => box.onclick = e => {
     const b = e.target.closest('button'); if (!b || !st.blind) return;
     const own = { ...(st.blind.own || {}) }; own[b.dataset.k] = !own[b.dataset.k];
     go({ own, ...(b.dataset.k !== 'font' ? { pal: undefined } : {}) });
-  };
+  });
   chip(q('#bFx'), '', t('blind.none')); for (const f of B_FX_MAIN) chip(q('#bFx'), f, t('bf.' + f));
   for (const f of B_FX_ORDER) if (!B_FX_MAIN.includes(f)) chip(q('#bFx2'), f, t('bf.' + f));
   chip(q('#bPost'), '', t('blind.none')); for (const p of B_POST_MAIN.concat(B_POST_ORDER.filter(p => !B_POST_MAIN.includes(p)))) chip(q('#bPost'), p, t('bp.' + p));
@@ -6355,7 +6331,7 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     ov.onpointerdown = e => {
       if (e.target.tagName === 'U') return;
       const [x, y] = pos(e), size = e.target.dataset.h === 'size';
-      if (!size){ sel = hit(x, y); refreshOne(); overlay(); if (!sel) return; openTab('box'); }
+      if (!size){ sel = hit(x, y); refreshOne(); overlay(); if (!sel) return; q('#pbody').scrollTop = 0; }
       e.preventDefault(); ov.setPointerCapture(e.pointerId); ov.focus({ preventScroll: true });
       const layer = sel.kind === 'layer', from = layer ? { dx: 0, dy: 0, k: 1, ...((st.blind.move || {})[sel.i] || {}) } : { ...items()[sel.i] };
       const r = selRect(), c = r ? [r.x + r.w / 2, r.y + r.h / 2] : [plan.W / 2, plan.H / 2];
@@ -6422,32 +6398,49 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     // 🔒 拆出来就钉住方案和主角：之后改样式、改颜色，这张脸不会换
     if (on && plan.blind.pin && (!st.blind.comp || !st.blind.look || (!st.blind.hero && plan.blind.pin.hero))){ const was = st.blind; st.blind = { ...was, comp: was.comp || plan.blind.pin.comp, look: was.look || plan.blind.pin.look, hero: was.hero || plan.blind.pin.hero, word: was.word || plan.blind.pin.word }; if (box()){ const k = box().hist.indexOf(was); if (k >= 0) box().hist[k] = st.blind; } }
     q('#bGo').textContent = on ? t('blind.again') : t('blind.open');
-    for (const id of ['#bPrev', '#bNext', '#bEdit', '#bKeep', '#bOff', '#bName']) q(id).hidden = !on;
-    const tab = q('#tabs button[data-v="box"]'); tab.hidden = !on;
-    if (!on){ label = ''; sel = null; ov = null; if (tab.getAttribute('aria-pressed') === 'true') openTab('text'); return; }
+    if (!on){ label = ''; sel = null; ov = null; q('#bName').textContent = ''; for (const id of ['#bPrev', '#bNext', '#bUndo', '#bRedo', '#bKeep']) q(id).disabled = true; thumbs(); return; }
     if (!box() || !box().hist.includes(st.blind)){ boxes.push({ hist: [st.blind], i: 0 }); at = boxes.length - 1; }       // 从收藏里点回来的
     const b = box();
     q('#bPrev').disabled = at <= 0; q('#bNext').disabled = at >= boxes.length - 1;
-    q('#bUndo').disabled = b.i <= 0; q('#bRedo').disabled = b.i >= b.hist.length - 1;
-    const n = plan.blind.name; label = n.comp; lookNow = n.look;
-    q('#bNow_comp').textContent = t('bc.' + n.comp); q('#bNow_look').textContent = t('bl.' + n.look); q('#bNow_fx').textContent = n.fx.map(f => t('bf.' + f)).join(' '); q('#bNow_post').textContent = n.post.map(f => t('bp.' + f)).join(' '); q('#bNow_add').textContent = n.scene.map(f => t('bs.' + f)).join(' ');
+    q('#bUndo').disabled = b.i <= 0; q('#bRedo').disabled = b.i >= b.hist.length - 1; q('#bKeep').disabled = false;
+    const n = plan.blind.name, moved = label !== n.comp, aired = lookNow !== n.look; label = n.comp; lookNow = n.look;
+    if (moved || !q('#bComp').children.length){ const g = groups.find(x => x[0] === compG && x[1].some(c => c.id === n.comp)) || groups.find(x => x[1].some(c => c.id === n.comp)); if (g && (g[0] !== compG || !q('#bComp').children.length)) buildComp(g[0]); }      // 掷到别的堆里去了，跟过去
+    if (aired || !q('#bLook').children.length){ const g = B_LOOK_GROUPS.find(x => x[0] === lookG); if (!q('#bLook').children.length || (g[1] && !g[1].includes(n.look))) buildLook('all'); }
+    if (!q('#bPals').children.length) buildPals(['first', 'cn', 'jp', 'intl'].includes(plan.blind.pal.src) ? plan.blind.pal.src : 'first');
     short = t('bc.' + n.comp) + ' · ' + t('bl.' + n.look);
     name = [short].concat(n.fx.map(f => t('bf.' + f)), n.post.map(f => t('bp.' + f)), n.scene.map(s => t('bs.' + s))).join(' · ');
     q('#bName').textContent = name;
     const own = st.blind.own || {}, B = plan.blind.B, pal = plan.blind.pal;
-    mask.querySelectorAll('.bx .amts .fs').forEach(d => { const v = Math.round(100 * ((st.blind.amt || {})[d.dataset.k] === undefined ? 1 : st.blind.amt[d.dataset.k])), i = d.querySelector('input'); if (+i.value !== v) i.value = v; d.lastElementChild.textContent = v + '%'; });
-    q('#bNow_pal').textContent = pal.src === 'tune' ? t('blind.tuned') : (pal.name || '');
+    mask.querySelectorAll('.amts').forEach(d => { const v = Math.round(100 * ((st.blind.amt || {})[d.dataset.k] === undefined ? 1 : st.blind.amt[d.dataset.k])), i = d.querySelector('input'); if (+i.value !== v) i.value = v; d.lastElementChild.textContent = v + '%'; });
     press('#bComp', v => v === n.comp); press('#bLook', v => v === n.look); press('#bFx', v => v ? n.fx.includes(v) : !n.fx.length); press('#bFx2', v => n.fx.includes(v)); press('#bPost', v => v ? B.post.includes(v) : !B.post.length);
-    press('#bPals', v => v === pal.id); press('#bLock', v => !!own[v]);
+    press('#bPals', v => v === pal.id); mask.querySelectorAll('.bLock button').forEach(b => b.setAttribute('aria-pressed', String(!!own[b.dataset.k])));
     const act = mask.getRootNode().activeElement;
     mask.querySelectorAll('#bFour input').forEach(i => { if (i !== act) i.value = bToHex(pal[i.dataset.k]); });
     if (!(act && act.type === 'color' && act.closest('#bDots'))) refreshOne();
-    overlay();
+    overlay(); thumbs();
+  }
+
+  // ── 小图 ────────────────────────────────────────────────────────
+  let drag0 = 0, thT = 0;
+  const th = mountThumbs({ alive, busy: () => typing() || Date.now() - drag0 < 260, view: () => (keptOpen() ? q('#keptPop') : q('#pbody')) });
+  mask.addEventListener('pointerdown', () => { drag0 = Date.now(); }, true); mask.addEventListener('pointermove', e => { if (e.buttons) drag0 = Date.now(); }, { passive: true });
+  // 先让海报画完、人的手停下来，再说小图
+  function thumbs(){ clearTimeout(thT); thT = setTimeout(thumbsNow, 220); }
+  function thumbsNow(){
+    if (!alive()) return;
+    const { text, title } = texts(), jobs = [], has = !!(text.trim() || title.trim()), now = { ...st, text, title, pages: '1', noGround: false }, gen = o => JSON.stringify([text, title, now.headText, now.source, now.date, now.sourcePrefix, now.showHeader, now.showSource, now.showDate, now.orient, now.spans, now.titleSpans, now.font, now.latinFont, now.titleFont, now.paper, now.paperLight, now.ink, now.inkLight, loadedCustom.size, o]);
+    if (keptOpen() && has) for (const p of kept.list()){ const c = q(`#bKept .ti[data-id="${p.id}"] canvas`); if (!c) continue; const set = setOf(p), bl = p.style.blind; jobs.push({ cv: c, key: 'k' + p.id + gen([bl, set]), st: () => ({ ...now, ...set, blind: blindFor({ ...bl }, text, title) }) }); }
+    if (st.blind && plan && plan.blind && has){
+      const v = tab();
+      if (v === 'comp'){ const bl = { ...st.blind, comp: undefined, move: undefined, keep: undefined, items: undefined }, g = gen(bl); q('#bComp').querySelectorAll('button[data-v]').forEach(b => { const id = b.dataset.v, c = b.querySelector('canvas'); if (!c) return; jobs.push({ cv: c, key: 'c' + id + g, want: id, st: () => ({ ...now, blind: { ...bl, comp: id } }), tell: ok => { if (ok) delete b.parentElement.dataset.no; else b.parentElement.dataset.no = '1'; b.title = ok ? '' : t('blind.compNo', { name: t('bc.' + id) }); } }); }); }
+      if (v === 'look'){ const bl = { ...st.blind, look: undefined, fx: undefined, post: undefined }, g = gen(bl); q('#bLook').querySelectorAll('button[data-v]').forEach(b => { const id = b.dataset.v, c = b.querySelector('canvas'); if (!c) return; jobs.push({ cv: c, key: 'l' + id + g, st: () => ({ ...now, blind: { ...bl, look: id } }) }); }); }
+    }
+    th.set(jobs);
   }
   const editing = on => mask.classList.toggle('bedit', on);
   const drop = () => { if (!sel) return false; sel = null; refreshOne(); overlay(); return true; };
   refreshOne();
-  return { refresh, editing, drop, take, frozen: () => (plan && plan.blind && st.blind ? frozen() : st.blind), state: () => ({ boxes, at, open }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
+  return { refresh, editing, drop, take, on, off, thumbs, kick: () => th.kick(), dispose: () => { clearTimeout(thT); th.dispose(); }, frozen: () => (plan && plan.blind && st.blind ? frozen() : st.blind), state: () => ({ boxes, at }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -6456,41 +6449,16 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
 // 两层，各走各的：
 //   ① 排布（.full）—— 纯 CSS，哪儿都有。iPhone 的 Safari 不让网页进真全屏，它只有这一层。
 //   ② 浏览器的全屏接口 —— 有就顺手要一下，要不到也不吭声，① 照样成立。
-// .sheet ＝ 控制面板露不露。手机上进来先收着，只看纸；宽屏两栏摆得下，默认露着。
+// .sheet ＝ 电脑上面板露不露。手机上不归它管：那边有抽屉，进全屏先把抽屉放下去。
 const FULL_CSS = `
-.cbar{display:flex;gap:6px;align-items:center;flex:0 0 auto}
-.cbar .count{flex:1;min-width:0}
-.cbar [hidden],.ftip[hidden]{display:none!important}
-.cbar button{border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;
-     font-size:11px;padding:4px 11px;cursor:pointer;letter-spacing:.06em;white-space:nowrap;flex:0 0 auto}
-.ftip{font-size:11px;color:var(--dim);line-height:1.5;flex:0 0 auto}
 .mask.full{padding:0}
 .mask.full .box{max-width:none;height:100%;border-radius:0;
-     padding:calc(12px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px))}
-.mask.full .pages{container-type:size;align-content:safe center;--pgmax:4000px}
-.mask.full:not(.sheet) .side{display:none}
-@media (max-width: 760px){
-  .cbar button{padding:8px 12px}
-  /* 一整张都要看得见：预览区给定高，纸按这块地方的宽和高两头收。
-     --need ＝ 按屏宽铺开要多高，横版卡片用不着那么高，就别占着。 */
-  .view{height:55%;height:min(55%, calc(var(--need, 100vw) + 112px))}
-  .mask.blind .view{height:62%;height:min(62%, calc(var(--need, 100vw) + 160px))}
-  .pages{container-type:size;padding:5px}      /* 选中的那圈边要有地方待，不然左右被裁掉 */
-  .bbar .nm{font-size:12px}
-  .mask.full .box .view{flex:1 1 auto;height:auto;max-height:none}
-  .mask.full.sheet .box .view{flex:0 0 56%}
-  .mask.full.sheet .side{min-height:0}
-  .mask.full .count{display:none}
-  .mask.full .cbar{justify-content:flex-end}
+     padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+@media (min-width: 761px){
+  .mask.full:not(.sheet) .box{grid-template-columns:0 0 minmax(0,1fr)}
+  .mask.full:not(.sheet) .side,.mask.full:not(.sheet) .tabs{visibility:hidden;border:0}
 }
 `;
-const fullHtml = () => `
-  <div class="cbar"><div class="count" id="count"></div>
-    <button id="fSave" hidden>${t('act.save')}</button>
-    <button id="fSheet" aria-expanded="false" hidden></button>
-    <button id="fGo" aria-pressed="false" title="${t('full.title')}"></button>
-  </div>
-  <div class="ftip" id="fTip" hidden></div>`;
 
 // 全屏是整页的事，不跟着哪一代面板走：换语言重拼面板时它还开着
 let fullOwn = false;      // 这个真全屏是不是拾句要来的；别人（网页自己）开的不去动它
@@ -6510,31 +6478,23 @@ function fullAsk(still){
   try { const r = ask.call(el, { navigationUI: 'hide' }); if (r && r.then) r.then(() => { if (!still()){ fullOwn = true; fullLeave(); } }, no); } catch { no(); }
 }
 
-function mountFull({ resume, mask, alive, tipEl, changed: told }){
-  const q = s => mask.querySelector(s), small = () => { try { return matchMedia('(max-width: 760px)').matches; } catch { return false; } };
-  let on = false, sheet = true, leftAt = 0, tipTimer = 0;
+function mountFull({ resume, mask, alive, changed: told, low }){
+  const q = s => mask.querySelector(s); let mq = null; try { mq = matchMedia('(max-width: 760px)'); } catch {}
+  const small = () => !!(mq && mq.matches);
+  let on = false, sheet = true, leftAt = 0;
   const paint = () => {
     mask.classList.toggle('full', on); mask.classList.toggle('sheet', on && sheet);
-    q('#fGo').textContent = on ? t('full.off') : t('full.on'); q('#fGo').setAttribute('aria-pressed', String(on));
-    q('#fSheet').hidden = !on; q('#fSheet').textContent = sheet ? t('full.hide') : t('full.show'); q('#fSheet').setAttribute('aria-expanded', String(sheet));
-    q('#fSave').hidden = !on || sheet;
-    if (!on || sheet) q('#fTip').hidden = true;
+    const go = q('#fGo'); go.innerHTML = on ? ICO.shrink : ICO.full; go.setAttribute('aria-pressed', String(on)); go.title = on ? t('full.off') : t('full.title'); go.setAttribute('aria-label', on ? t('full.off') : t('full.on'));
+    const sh = q('#fSheet'); sh.hidden = !on; sh.innerHTML = ICO.side; sh.title = sheet ? t('full.hide') : t('full.show'); sh.setAttribute('aria-label', sh.title); sh.setAttribute('aria-expanded', String(sheet));
+    q('#fSave').hidden = !(small() || (on && !sheet));      // 手机上存图在拇指边；电脑上面板收着的时候，底下那颗看不见了
     if (told) told();      // 纸变大了，草样可能就不够清楚了
   };
-  const go = v => { if (on === v) return; on = v; if (on){ sheet = !small(); fullAsk(() => on && alive()); } else fullLeave(); paint(); };
+  const go = v => { if (on === v) return; on = v; if (on){ sheet = true; if (small() && low) low(); fullAsk(() => on && alive()); } else fullLeave(); paint(); };
   q('#fGo').onclick = () => go(!on);
   q('#fSheet').onclick = () => { sheet = !sheet; paint(); };
   q('#fSave').onclick = () => q('#save').click();
-  // 「改一改」要用面板：收着的话替你拉开。只认这颗按钮 —— 在纸上点中一块字也会翻到「盒」那一屏，
-  // 那时候拉开面板，纸会从手指底下缩走
-  q('#bEdit').addEventListener('click', () => { if (on && !sheet){ sheet = true; paint(); } });
-  // 面板收着，底下那行话（「已存 1 张」）就看不见了，借到纸旁边说
-  const mo = new MutationObserver(() => {
-    const s = tipEl.textContent; if (!on || sheet || !s) return;
-    q('#fTip').textContent = s; q('#fTip').hidden = false;
-    clearTimeout(tipTimer); tipTimer = setTimeout(() => { q('#fTip').hidden = true; }, 5000);
-  });
-  mo.observe(tipEl, { childList: true, characterData: true, subtree: true });
+  const sized = () => { if (alive()) paint(); };
+  if (mq && mq.addEventListener) mq.addEventListener('change', sized);
   // 用户从浏览器那头退的（Esc、安卓的返回、下拉）：排布跟着收
   const changed = () => {
     if (!alive()) return dispose();
@@ -6544,7 +6504,7 @@ function mountFull({ resume, mask, alive, tipEl, changed: told }){
   for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, changed);
   function dispose(){
     for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.removeEventListener(ev, changed);
-    mo.disconnect(); clearTimeout(tipTimer);
+    if (mq && mq.removeEventListener) mq.removeEventListener('change', sized);
   }
   if (resume && resume.on){ on = true; sheet = resume.sheet; }
   paint();
@@ -6749,6 +6709,289 @@ async function fontFromLink(text, ask){
   return out;
 }
 // ════════════════════════════════════════════════════════════════════
+//  6g. 小图：方案、气氛、常用版式，用你正在排的这段字现画
+// ════════════════════════════════════════════════════════════════════
+// 海报先出来，小图后到。规矩：
+//   ① 只画看得见的；② 趁空一张一张画，人一动手就停；③ 同样的字、同样的设置画过就留着；
+//   ④ 四分之一大小画，一张多半几毫秒。
+const THUMB_DPR = .25, THUMB_KEEP = 260;
+function mountThumbs({ alive, busy, view }){
+  const cache = new Map();      // key → { cv, ok }
+  let queue = [], running = false, timer = 0;
+  const idle = fn => (typeof requestIdleCallback === 'function' ? requestIdleCallback(fn, { timeout: 400 }) : setTimeout(fn, 24));
+  const seen = el => { if (!el.isConnected) return false; const r = el.getBoundingClientRect(); if (!r.width) return false; const v = view().getBoundingClientRect(); return r.bottom > v.top - 40 && r.top < v.bottom + 120; };
+  const lay = (job, got) => {
+    const c = job.cv, g = got.cv; if (c.width !== g.width || c.height !== g.height){ c.width = g.width; c.height = g.height; }
+    const x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height); x.drawImage(g, 0, 0); c.dataset.key = job.key;
+    if (job.tell) job.tell(got.ok);
+  };
+  const paint = job => {
+    const cv = PLATFORM.canvas(8, 8); let ok = true;
+    try { const s = job.st(), plan = planPages(s); ok = !job.want || !!(plan.blind && plan.blind.comp === job.want); if (plan.blind) withDPR(THUMB_DPR, () => renderPage(cv, s, plan, 0)); else ok = false; } catch { ok = false; }
+    const got = { cv, ok }; cache.set(job.key, got);
+    if (cache.size > THUMB_KEEP) cache.delete(cache.keys().next().value);
+    return got;
+  };
+  const step = () => {
+    if (!alive()){ running = false; queue = []; return; }
+    if (busy()){ timer = setTimeout(step, 160); return; }
+    const i = queue.findIndex(j => seen(j.cv));
+    if (i < 0){ running = false; return; }      // 剩下的都看不见：等滚到再说
+    const job = queue.splice(i, 1)[0]; lay(job, paint(job)); idle(step);
+  };
+  const kick = () => { if (!running && queue.length){ running = true; idle(step); } };
+  // jobs：[{ cv, key, st: () => 排它用的设置, want?: 非得是这种方案, tell?: ok => {} }]
+  const set = jobs => {
+    queue = [];
+    for (const j of jobs){ if (j.cv.dataset.key === j.key) continue; const got = cache.get(j.key); if (got){ cache.delete(j.key); cache.set(j.key, got); lay(j, got); } else queue.push(j); }
+    kick();
+  };
+  return { set, kick, dispose(){ queue = []; clearTimeout(timer); cache.clear(); } };
+}
+// ════════════════════════════════════════════════════════════════════
+//  6f. 骨架：两个模式（排信纸 / 拆盲盒）、标签栏、钉底的存图、手机上的抽屉
+// ════════════════════════════════════════════════════════════════════
+// 电脑：顶栏横着，左边一条标签，中间面板，右边纸。手机：纸在上，抽屉在中间，标签在拇指底下。
+// 🔑 规矩：每个模式只摆对它起作用的几屏；存图永远在手边；一年改不了两次的收进「⋯」。
+const FRAME_CSS = `
+.box [hidden]{display:none!important}
+.box{position:relative;display:grid;grid-template:54px minmax(0,1fr)/62px 322px minmax(0,1fr);gap:0;padding:0;border-radius:12px;overflow:hidden;
+     max-width:1240px;width:100%;height:min(100%,900px);max-height:100%}
+.hd{grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:0 12px 0 18px;border-bottom:1px solid var(--line);min-width:0}
+.hd h2{margin:0;font-size:14px;letter-spacing:.2em;font-weight:500;color:var(--fg);white-space:nowrap}
+.hd p.h{margin:0 0 0 8px;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.hd .sp{flex:1 1 0;min-width:4px}
+.hb{flex:0 0 auto;min-width:34px;height:34px;padding:0;border:0;background:transparent;border-radius:999px;color:var(--fg);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:12px;letter-spacing:.06em}
+.hb.w{padding:0 12px}
+.hb svg,.bbar svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;display:block}
+@media (hover:hover){ .hb:hover{background:var(--soft)} }
+#more svg{stroke-width:3}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--field);flex:0 0 auto}
+.seg button{border:0;background:transparent;padding:6px 15px;font-size:12px;color:var(--dim);letter-spacing:.06em;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg)}
+.tabs{display:flex;flex-direction:column;gap:2px;margin:0;padding:10px 0;border:0;border-right:1px solid var(--line);overflow:auto}
+.tabs button{flex:0 0 46px;position:relative;margin:0;padding:0 2px;border:0;background:transparent;color:var(--dim);font-size:12px;letter-spacing:.06em;cursor:pointer}
+.tabs button[aria-pressed=true]{color:var(--fg)}
+.tabs button[aria-pressed=true]::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:2px;background:var(--on-bg)}
+.side{display:flex;flex-direction:column;min-width:0;min-height:0;width:auto;overflow:hidden;padding:0;border-right:1px solid var(--line)}
+.grab{display:none}
+.pbody{flex:1 1 0;min-height:0;overflow:auto;overscroll-behavior:contain;padding:14px 16px 20px}
+.pane{padding-top:0}
+.pane>label:first-child,.pane>.sub:first-child{margin-top:0}
+.foot{flex:0 0 auto;display:flex;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}
+.foot button.save{flex:1 1 auto;border:0;border-radius:6px;padding:11px 8px;font-size:13px;letter-spacing:.2em;cursor:pointer}
+.foot button.copy{flex:0 0 auto;border:0;border-radius:6px;padding:11px 13px;font-size:13px;cursor:pointer}
+.tg{flex:0 0 auto;display:inline-flex;gap:6px;align-items:center;border:0;background:transparent;padding:6px 0;font-size:11px;color:var(--dim);cursor:pointer;letter-spacing:0}
+.tg u{flex:0 0 auto;width:28px;height:16px;border-radius:9px;background:var(--line);position:relative;transition:background .2s}
+.tg u::after{content:"";position:absolute;width:12px;height:12px;border-radius:50%;background:#fff;left:2px;top:2px;transition:left .2s}
+.tg[aria-pressed=true] u{background:var(--on-bg)} .tg[aria-pressed=true] u::after{left:14px;background:var(--on-fg)}
+.view{min-width:0;min-height:0;padding:12px 18px 12px;gap:8px}
+.count{min-height:14px;text-align:center}
+.pages{container-type:size;align-content:safe center;--pgmax:4000px;padding:6px}
+.nm{font-size:11px;color:var(--dim);text-align:center;letter-spacing:.06em;flex:0 0 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:15px}
+.tip{min-height:17px;margin:0;text-align:center;flex:0 0 auto}
+.bbar{display:flex;justify-content:center;align-items:center;gap:8px;flex:0 0 auto;min-height:42px}
+.bbar button{flex:0 0 auto;border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;cursor:pointer;font-size:13px;padding:0}
+.bbar button.ic{width:38px;height:38px;display:inline-flex;align-items:center;justify-content:center}
+.bbar button.go{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg);padding:11px 26px;letter-spacing:.14em;white-space:nowrap}
+.bbar button.sv{background:var(--soft);border-color:transparent;padding:11px 18px;letter-spacing:.14em;white-space:nowrap}
+.bbar .gap{width:10px}
+.bbar button:disabled,.bx button:disabled{opacity:.32;cursor:default}
+.mask[data-mode=plain] .bbar>:not(.sv){display:none}
+.mask[data-mode=plain] .bx,.mask[data-mode=box] .pl{display:none!important}
+.mask[data-mode=plain] .nm{display:none}
+@media (min-width: 761px){ .mask[data-mode=plain] .bbar{min-height:0} }
+/* 一行一件：名字、字、开关 */
+.rw{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);padding:3px 0}
+.rws{border-top:1px solid var(--line);margin-top:16px}
+.rw>span{flex:0 0 auto;min-width:34px;font-size:12px;color:var(--fg)}
+.rw input[type=text]{border:0;background:transparent;padding:8px 4px;font-size:12px;min-width:0;flex:1 1 0;width:auto}
+.rw input.mini{flex:0 0 46px;color:var(--dim)}
+.pane .flist{gap:1px}
+.pane .flist button{border-color:transparent;background:transparent}
+.pane .flist button[aria-pressed=true]{background:var(--on-bg)}
+.fold{border-top:1px solid var(--line);margin-top:10px}
+.fold>summary{cursor:pointer;list-style:none;padding:11px 2px;font-size:12px;color:var(--dim);letter-spacing:.04em;display:flex;justify-content:space-between}
+.fold>summary::-webkit-details-marker{display:none}
+.fold>summary::after{content:"+"} .fold[open]>summary::after{content:"–"}
+.ctr{text-align:center;margin-bottom:12px}
+/* 小图 */
+.gs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;margin:0 -16px 12px;padding:0 12px}
+.gs::-webkit-scrollbar{display:none}
+.gs button{flex:0 0 auto;white-space:nowrap;border:0;background:transparent;font-size:12px;color:var(--dim);padding:6px 10px;border-radius:999px;cursor:pointer}
+.gs button[aria-pressed=true]{background:var(--soft);color:var(--fg)}
+.th{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 8px}
+.th .ti{position:relative;min-width:0}
+.th .ti>button:first-child{display:block;width:100%;border:0;background:transparent;padding:0;cursor:pointer;font-size:11px;color:var(--dim);line-height:1.35;text-align:center}
+.th canvas,.th .re{display:block;width:100%;aspect-ratio:var(--ar,.8);border-radius:3px;margin-bottom:5px;background:var(--soft);box-shadow:0 1px 6px rgba(0,0,0,.14)}
+.th .re{display:flex;align-items:center;justify-content:center;background:transparent;box-shadow:none;border:1px dashed var(--dim);opacity:.75}
+.th .re svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.th button[aria-pressed=true]{color:var(--fg)!important}
+.th button[aria-pressed=true] canvas{outline:2px solid var(--on-bg);outline-offset:2px}
+.th .ti[data-no] canvas{opacity:.28}
+.th .ti .x{position:absolute;right:-4px;top:-5px;width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:var(--bg);color:var(--dim);font:13px/1 sans-serif;padding:0;cursor:pointer}
+.pop{position:absolute;right:12px;top:50px;z-index:6;width:250px;max-height:calc(100% - 64px);overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px 16px}
+.pop .foot{padding:0 0 14px;margin-bottom:12px;border-top:0;border-bottom:1px solid var(--line)}
+.pop .foot .tg{margin-left:auto}
+.pop .sub{margin:12px 0 6px;font-size:11px}.pop .sub:first-child{margin-top:0}
+.pop .th{grid-template-columns:1fr 1fr}
+@media (max-width: 760px){
+  .box{display:flex;flex-direction:column;border-radius:0;height:100%;max-height:100%;padding:0;gap:0}
+  .hd{flex:0 0 50px;padding:0 6px 0 16px;gap:2px}
+  .hd p.h,.hb.w span,#fSheet{display:none!important}
+  .hb{min-width:40px;height:40px}.hb.w{padding:0}
+  .seg button{padding:9px 15px}
+  .view{flex:1 1 0;height:auto;max-height:none;padding:6px 12px 4px;gap:5px;order:0}
+  .count:not([data-note]){display:none}
+  .pages{padding:5px}
+  .tip:empty{display:none}
+  .tip{max-height:34px;overflow:hidden}
+  .bbar{gap:5px;min-height:46px}
+  .bbar button.ic{width:38px;height:42px}
+  .bbar button.go{padding:12px 15px;letter-spacing:.06em}
+  .bbar button.sv{padding:12px 13px;letter-spacing:.06em}
+  .bbar .gap{display:none}
+  .side{order:1;flex:0 0 auto;height:var(--sh,40%);border-right:0;border-top:1px solid var(--line);transition:height .26s cubic-bezier(.22,.61,.36,1)}
+  .side.drag{transition:none}
+  .mask[data-sh=low] .side{height:22px}
+  .mask[data-sh=tall] .side{height:54%}
+  .mask[data-sh=low] .pbody,.mask[data-sh=low] .foot{visibility:hidden}
+  .grab{display:flex;flex:0 0 22px;width:100%;border:0;background:transparent;padding:0;align-items:center;justify-content:center;cursor:grab;touch-action:none}
+  .grab::after{content:"";width:40px;height:4px;border-radius:3px;background:var(--line)}
+  .pbody{padding:0 16px 12px}
+  .foot button.save{display:none}
+  .tabs{order:2;flex:0 0 auto;flex-direction:row;padding:0 4px env(safe-area-inset-bottom,0px);border-right:0;border-top:1px solid var(--line);overflow:visible}
+  .tabs button{flex:1 1 0;height:50px;font-size:13px;letter-spacing:0;min-width:0}
+  .tabs button[aria-pressed=true]::before{left:22%;right:22%;top:0;bottom:auto;width:auto;height:2px}
+  .gs button{padding:9px 12px;font-size:13px}
+  .th .ti>button:first-child{font-size:12px}
+  .rw input[type=text]{padding:11px 4px;font-size:13px}
+  .tg{padding:9px 0;font-size:12px}
+  .fold>summary{padding:14px 2px;font-size:13px}
+  .pop{right:8px;left:8px;width:auto;top:48px}
+  .pop .th{grid-template-columns:repeat(3,1fr)}
+  /* 打字：键盘一上来只剩半屏，让给字和纸，别的先退下 */
+  .mask.typing .hd,.mask.typing .tabs,.mask.typing .bbar,.mask.typing .nm,.mask.typing .foot,.mask.typing .grab{display:none}
+  .mask.typing .view{flex:0 0 38%}
+  .mask.typing .side{flex:1 1 0;height:auto}
+  .mask.typing .pbody{padding-top:12px}
+}
+@media (max-width: 400px){ .hd{padding-left:12px} .hd .hb{min-width:36px} .hd .seg button{padding:9px 12px} }
+@media (max-width: 379px){ #bRedo,.hd h2{display:none!important} .bbar{gap:4px} .bbar button.ic{width:34px} .bbar button.go{padding:12px 11px;letter-spacing:0} .bbar button.sv{padding:12px 11px;letter-spacing:0} }
+`;
+const svg = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+const ICO = {
+  prev: svg('M15 5l-7 7 7 7'), next: svg('M9 5l7 7-7 7'), undo: svg('M8 5L4 9l4 4M4 9h10a6 6 0 0 1 0 12h-3'), redo: svg('M16 5l4 4-4 4M20 9H10a6 6 0 0 0 0 12h3'),
+  heart: svg('M12 20s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 7.3 4.2 4.2 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z'), full: svg('M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'), shrink: svg('M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5'),
+  more: svg('M5.5 12h.02M12 12h.02M18.5 12h.02'), close: svg('M6 6l12 12M18 6L6 18'), side: svg('M4 5h16v14H4zM10 5v14'), again: svg('M20 6v5h-5M19.5 11A7.5 7.5 0 1 0 20 15'),
+};
+const FRAME_TABS = { plain: ['text', 'paper', 'font', 'ink', 'layout'], box: ['text', 'comp', 'look', 'pal', 'feel', 'font', 'add'] };
+const tabsHtml = () => [...new Set([...FRAME_TABS.plain, ...FRAME_TABS.box])].sort((a, b) => ['text', 'paper', 'comp', 'look', 'pal', 'feel', 'font', 'ink', 'layout', 'add'].indexOf(a) - ['text', 'paper', 'comp', 'look', 'pal', 'feel', 'font', 'ink', 'layout', 'add'].indexOf(b)).map(k => `<button data-v="${k}">${t('tab.' + k)}</button>`).join('');
+const headHtml = (init) => `
+  <div class="hd">
+    <h2>${t('app.title')}</h2><p class="h" id="tag"></p><span class="sp"></span>
+    <span class="seg" id="mode"><button data-v="plain">${t('mode.plain')}</button><button data-v="box">${t('mode.box')}</button></span><span class="sp"></span>
+    <button class="hb w" id="bMine" aria-expanded="false" title="${t('blind.mineTitle')}">${ICO.heart}<span>${t('blind.mineShort')}</span></button>
+    <button class="hb" id="fSheet" hidden></button>
+    <button class="hb" id="fGo" aria-pressed="false"></button>
+    <button class="hb" id="more" aria-expanded="false" title="${t('head.more')}" aria-label="${t('head.more')}">${ICO.more}</button>
+    <button class="hb" id="close" title="${t('act.close')}" aria-label="${t('act.close')}">${ICO.close}</button>
+  </div>`;
+const popsHtml = init => `
+  <div class="pop" id="morePop" hidden>
+    <div class="sub">${t('head.theme')}</div>
+    <span class="seg" id="theme"><button data-v="auto">${t('theme.auto')}</button><button data-v="day">${t('theme.day')}</button><button data-v="night">${t('theme.night')}</button></span>
+    <div id="lang" style="margin-top:14px"${hostLocale(init.locale) ? ' hidden' : ''}><div class="sub">${t('head.lang')}</div>
+      <span class="seg"><button data-v="zh-CN" aria-pressed="${studioLocale !== 'en'}">中文</button><button data-v="en" aria-pressed="${studioLocale === 'en'}">English</button></span></div>
+  </div>
+  <div class="pop" id="keptPop" hidden><div class="sub">${t('blind.mineTitle')}</div><div class="th" id="bKept"></div><p class="pkhint" id="bKeptNone">${t('blind.mineNone')}</p></div>`;
+const barHtml = () => `
+  <div class="nm" id="bName"></div>
+  <div class="bbar" id="bbar">
+    <button class="ic" id="bPrev" title="${t('blind.prev')}" aria-label="${t('blind.prev')}">${ICO.prev}</button>
+    <button class="go" id="bGo" title="${t('blind.openTitle')}">${t('blind.open')}</button>
+    <button class="ic" id="bNext" title="${t('blind.next')}" aria-label="${t('blind.next')}">${ICO.next}</button>
+    <span class="gap"></span>
+    <button class="ic" id="bUndo" title="${t('blind.undo')}" aria-label="${t('blind.undo')}">${ICO.undo}</button>
+    <button class="ic" id="bRedo" title="${t('blind.redo')}" aria-label="${t('blind.redo')}">${ICO.redo}</button>
+    <button class="ic" id="bKeep" title="${t('blind.keepTitle')}" aria-label="${t('blind.keep')}">${ICO.heart}</button>
+    <button class="sv" id="fSave" hidden>${t('act.save')}</button>
+  </div>`;
+
+// 骨架自己的事：换模式、换标签、弹层、抽屉、打字时让位。
+//   moved ＝ 同一块控件两个模式都用，换模式时搬到那边去：[[选择器, 排信纸时的家, 拆盲盒时的家]]
+function mountFrame({ mask, resume, alive, onTab, onMode, moved }){
+  const q = s => mask.querySelector(s), small = () => { try { return matchMedia('(max-width: 760px)').matches; } catch { return false; } };
+  const last = { plain: 'text', box: 'comp', ...(resume && resume.last) };
+  let mode = '', tab = '';
+  // ── 标签 ────────────────────────────────────────────────────────
+  const show = v => {
+    if (!FRAME_TABS[mode].includes(v)) v = FRAME_TABS[mode][0];
+    tab = v; last[mode] = v;
+    mask.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-pressed', x.dataset.v === v));
+    mask.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.p === v));
+    q('#pbody').scrollTop = 0;
+    onTab(v, mode);
+  };
+  q('#tabs').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (small() && b.dataset.v === tab){ sheet(mask.dataset.sh === 'low' ? 'mid' : mask.dataset.sh === 'mid' ? 'tall' : 'low'); return; }      // 再点一下正开着的：抽屉拉高、收起
+    if (small() && mask.dataset.sh === 'low') sheet('mid');
+    show(b.dataset.v);
+  };
+  const setMode = m => {
+    if (m === mode) return;
+    mode = m; mask.dataset.mode = m;
+    q('#mode').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === m));
+    mask.querySelectorAll('#tabs button').forEach(b => { b.hidden = !FRAME_TABS[m].includes(b.dataset.v); });
+    for (const [what, plain, box] of moved) q(m === 'box' ? box : plain).append(q(what));
+    show(last[m]);
+  };
+  q('#mode').onclick = e => { const b = e.target.closest('button'); if (b && b.dataset.v !== mode) onMode(b.dataset.v); };
+  // ── 弹层 ────────────────────────────────────────────────────────
+  const pops = [['#more', '#morePop'], ['#bMine', '#keptPop']];
+  const shut = () => { let any = false; for (const [b, p] of pops) if (!q(p).hidden){ q(p).hidden = true; q(b).setAttribute('aria-expanded', 'false'); any = true; } return any; };
+  const pop = (b, p, on) => { const want = on === undefined ? q(p).hidden : on; shut(); q(p).hidden = !want; q(b).setAttribute('aria-expanded', String(want)); };
+  for (const [b, p] of pops) q(b).onclick = () => pop(b, p);
+  mask.addEventListener('pointerdown', e => { if (!pops.some(([b, p]) => e.target.closest(b) || e.target.closest(p))) shut(); }, true);
+  // ── 抽屉（只有手机看得见把手）──────────────────────────────────
+  const sheet = v => { mask.dataset.sh = v; };
+  sheet((resume && resume.sh) || 'mid');
+  const grab = q('#grab'), side = q('.side');
+  grab.onpointerdown = e => {
+    e.preventDefault(); grab.setPointerCapture(e.pointerId);
+    const y0 = e.clientY, h0 = side.offsetHeight, H = q('.box').offsetHeight; let dy = 0;
+    side.classList.add('drag');
+    grab.onpointermove = ev => { dy = y0 - ev.clientY; if (Math.abs(dy) > 4) side.style.height = Math.max(22, Math.min(H * .72, h0 + dy)) + 'px'; };
+    grab.onpointerup = grab.onpointercancel = () => {
+      grab.onpointermove = grab.onpointerup = grab.onpointercancel = null; side.classList.remove('drag');
+      const h = side.offsetHeight / H; side.style.height = '';
+      if (Math.abs(dy) <= 4) sheet(mask.dataset.sh === 'low' ? 'mid' : mask.dataset.sh === 'mid' ? 'tall' : 'low');
+      else sheet(h < .2 ? 'low' : h < .5 ? 'mid' : 'tall');
+    };
+  };
+  // 手机上「存图」在拇指边，复制和透明底不常用，收进「⋯」，把地方让给小图
+  const home = () => { const f = q('.foot'), want = small() ? q('#morePop') : q('.side'); if (f.parentElement !== want){ if (small()) want.prepend(f); else want.append(f); } };
+  home(); let mq = null; try { mq = matchMedia('(max-width: 760px)'); mq.addEventListener('change', home); } catch {}
+  // ── 打字 ────────────────────────────────────────────────────────
+  // 认「眼前这块屏真的矮了一截」，不认焦点：接着实体键盘的、键盘不挤屏的，都不动排布；
+  // 安卓按返回收键盘，焦点还在框里，屏一长回来也就还原 —— 认焦点的话会卡在打字的样子里出不来
+  const vv = window.visualViewport, touch = () => { try { return matchMedia('(pointer: coarse)').matches; } catch { return false; } };
+  let base = vv ? vv.height : 0, wide = vv ? vv.width : 0, typeT = 0;
+  const typing = () => {
+    clearTimeout(typeT); typeT = setTimeout(() => {
+      if (!alive() || !vv) return;
+      if (Math.abs(vv.width - wide) > 40){ wide = vv.width; base = vv.height; } base = Math.max(base, vv.height);
+      const el = mask.getRootNode().activeElement, on = small() && touch() && !!el && el.matches && el.matches('textarea,input[type=text],input[type=number]') && vv.height < base * .82;
+      mask.classList.toggle('typing', on);
+    }, 90);
+  };
+  if (vv) vv.addEventListener('resize', typing);
+  q('.side').addEventListener('focusin', typing); q('.side').addEventListener('focusout', typing);
+  q('.view').addEventListener('pointerdown', () => { const el = mask.getRootNode().activeElement; if (mask.classList.contains('typing') && el && el.blur) el.blur(); });
+  return { dispose(){ clearTimeout(typeT); if (vv) vv.removeEventListener('resize', typing); if (mq) try { mq.removeEventListener('change', home); } catch {} }, setMode, show, shut, pop, sheet, tab: () => tab, mode: () => mode, state: () => ({ last, sh: mask.dataset.sh }) };
+}
+// ════════════════════════════════════════════════════════════════════
 //  7. 界面（关在 shadow DOM 里，免得被网站的 CSS 冲了）
 // ════════════════════════════════════════════════════════════════════
 const CSS = `
@@ -6777,13 +7020,8 @@ const CSS = `
       overflow:hidden;overscroll-behavior:contain}
 .mask[data-vv]{right:auto;bottom:auto;
       left:var(--vvl,0px);top:var(--vvt,0px);width:var(--vvw,100%);height:var(--vvh,100%)}
-/* max-height 跟着遮罩的实高走，不跟 vh —— vh 量的是「地址栏收起时」的大视口，
-   手机上永远比眼前这块屏高一截。 */
-.box{background:var(--bg);border-radius:8px;max-width:1240px;width:100%;max-height:100%;
-     display:flex;gap:18px;padding:18px;box-shadow:var(--shadow)}
-.side{width:308px;flex:0 0 308px;overflow:auto;overscroll-behavior:contain;padding-right:6px}
-.side h2{margin:0 0 2px;font-size:14px;letter-spacing:.16em;color:var(--fg)}
-.side p.h{margin:0 0 12px;font-size:11px;color:var(--dim)}
+/* 高跟着遮罩走，不跟 vh —— vh 量的是「地址栏收起时」的大视口，手机上永远比眼前这块屏高一截。 */
+.box{background:var(--bg);color:var(--fg);box-shadow:var(--shadow)}
 label{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.1em;
       color:var(--dim);margin:13px 0 5px}
 /* 🔴 这三条原本写的是「label .sw …」（这段 CSS 住在模板字符串里，注释别用反引号）
@@ -6808,11 +7046,6 @@ input[type=text]:disabled{opacity:.5}
 .inks button,.row button.sw2{position:relative;padding-left:22px}
 .inks i,.row button.sw2 i{position:absolute;left:6px;top:50%;transform:translateY(-50%);
      width:10px;height:10px;border-radius:50%;border:1px solid rgba(128,128,128,.35)}
-/* 分页标签：东西一多，平铺的按钮墙就没法看了，拆成几屏 */
-.tabs{display:flex;gap:2px;margin:12px 0 0;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;padding:7px 2px;border:0;background:transparent;color:var(--dim);
-     font-size:12px;letter-spacing:.1em;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs button[aria-pressed=true]{color:var(--fg);border-bottom-color:var(--on-bg)}
 .pane{display:none;padding-top:2px}
 .pane.on{display:block}
 /* 纸：直接看缩略图，比看名字快得多 */
@@ -6842,11 +7075,8 @@ input[type=text]:disabled{opacity:.5}
 .fs input[type=number]{width:62px;border:1px solid var(--line);border-radius:4px;padding:5px 6px;
      font:13px inherit;text-align:center;color:var(--fg);background:var(--field)}
 .fs .val{width:44px;text-align:right;font-size:11px;color:var(--dim)}
-.acts{display:flex;gap:8px;margin-top:14px}
-.acts button{flex:1;padding:10px;border:0;border-radius:4px;font-size:13px;letter-spacing:.14em;cursor:pointer}
 .save{background:var(--on-bg);color:var(--on-fg)}
 .copy{background:var(--soft);color:var(--fg)}
-.close{background:transparent;color:var(--dim);border:1px solid var(--line)!important}
 .tip{font-size:11px;color:var(--dim);min-height:30px;line-height:1.55;margin-top:8px}
 .view{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .count{font-size:11px;color:var(--dim);letter-spacing:.08em;flex:0 0 auto}
@@ -6859,29 +7089,16 @@ input[type=text]:disabled{opacity:.5}
 .pg canvas{display:block;max-width:100%;box-shadow:0 6px 20px rgba(0,0,0,.18);border-radius:2px;
        outline:2px solid transparent;outline-offset:3px;touch-action:pinch-zoom}
 .pg[aria-selected=true] canvas{outline-color:rgba(185,32,11,.7)}
+.pages[data-n="1"] .pg canvas{outline:0}
 .mask.bare .pg canvas{background:repeating-conic-gradient(#d9d9d9 0 25%,#f4f4f4 0 50%) 0 0/18px 18px}
 .pg span{position:absolute;left:6px;top:6px;background:rgba(18,16,14,.72);color:#faf8f4;
        font-size:10px;padding:1px 6px;border-radius:3px}
 
-/* 手机：左右分栏在窄屏上必死 —— 侧栏钉死 308px，预览区被挤成 0 宽，
-   实测 375px 视口下画布量出来就是 0×0（能操作，但一眼都看不见成品）。
-   改成上下叠：预览在上，控制在下。 */
 @media (max-width: 760px){
   .mask{padding:0}
-  .box{flex-direction:column;gap:10px;padding:12px;border-radius:0;
-       width:100%;height:100%;max-height:100%}
-  /* 55%：竖版卡片按屏宽铺开正好这么高，整张能一眼看全，不用滚。
-     原来写的是 55vh —— vh 认的是地址栏收起时的大视口，键盘一弹它比整个面板还高，
-     底下的控制区被挤成零；而 dvh 老内核不认，整条 height 被丢掉。都换成百分比，
-     一路跟着 .box → .mask → visual viewport。 */
-  .view{order:-1;flex:0 0 auto;max-height:55%;min-height:0}
-  .pages{padding:0;gap:8px}
-  .side{width:auto;flex:1 1 auto;padding-right:0}
-  .side h2{font-size:13px}
-  textarea{height:88px}
-  .acts button{padding:12px}
-  /* 手指按不准 24px 高的按钮。桌面上 29×24 够用，手机上把这几排撑开。 */
-  .tabs button{padding:11px 2px;font-size:13px}
+  .pages{gap:8px}
+  textarea{height:104px}
+  /* 手指按不准 24px 高的按钮 */
   .sw button{padding:10px 11px;font-size:11px}
   .row button{padding:10px 6px}
 }
@@ -6899,7 +7116,7 @@ function ui(){
   host = document.createElement('div');
   host.style.cssText = 'all:initial;position:static';
   root = host.attachShadow({ mode: 'open' });
-  const st = document.createElement('style'); st.textContent = CSS + PICK_CSS + BLIND_CSS + FULL_CSS; root.append(st);
+  const st = document.createElement('style'); st.textContent = CSS + PICK_CSS + BLIND_CSS + FULL_CSS + FRAME_CSS; root.append(st);
   document.documentElement.append(host);
   pill = null;
 }
@@ -7001,89 +7218,75 @@ function openPanel(text, init = {}){
     mask.classList.toggle('night', night);
   };
 
-  mask = document.createElement('div'); mask.className = 'mask';
+  mask = document.createElement('div'); mask.className = 'mask'; mask.dataset.mode = st.blind ? 'box' : 'plain';
   // 本代面板的身份证：关掉或被新面板顶替后，这一代遗留的异步回调
   // （字体装载、纸解码、聚焦定时器、主题监听）一律安静退场，不再摸已空的 mask。
   const thisMask = mask;
   const alive = () => mask === thisMask;
   mask.innerHTML = `
     <div class="box">
+      ${headHtml(init)}
+      <div class="tabs" id="tabs">${tabsHtml()}</div>
       <div class="side">
-        <h2>${t('app.title')}<span class="sw" id="lang" style="float:right;margin-left:6px${hostLocale(init.locale) ? ';display:none' : ''}"><button title="${t('lang.toggle')}" aria-label="${t('lang.toggle')}">${studioLocale === 'en' ? '中' : 'EN'}</button></span><span class="sw" id="theme" style="float:right">
-          <button data-v="auto">${t('theme.auto')}</button><button data-v="day">${t('theme.day')}</button><button data-v="night">${t('theme.night')}</button>
-        </span></h2><p class="h" id="tag"></p>
-
-        <div class="tabs" id="tabs">
-          <button data-v="text">${t('tab.text')}</button><button data-v="paper">${t('tab.paper')}</button>
-          <button data-v="font">${t('tab.font')}</button><button data-v="ink">${t('tab.ink')}</button>
-          <button data-v="layout">${t('tab.layout')}</button>
-          <button data-v="box" hidden>${t('tab.box')}</button>
-        </div>
-
+        <button class="grab" id="grab" aria-label="${t('head.grab')}"></button>
+        <div class="pbody" id="pbody">
+        ${blindOneHtml()}
         <div class="pane" data-p="text">
-          <label>${t('text.title')}<span class="sw"><span style="font-size:10px">${t('text.sizeWeight')}</span></span></label>
-          <input type="text" id="ti" placeholder="${t('text.titlePh')}">
-          <div class="fs" style="margin-top:6px">
-            <input type="range" id="ts" min="20" max="140" step="1">
-            <input type="number" id="tsn" min="12" max="300" step="1">
-            <span class="sw" id="tw">
-              <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
-          </div>
-          <label>${t('text.body')}<span class="sw"><span style="font-size:10px">${t('text.sizeWeight')}</span></span></label>
+          <label>${t('text.body')}</label>
           <div class="ta"><div class="bk" aria-hidden="true"><div></div></div><textarea id="t"></textarea></div>
           ${pickHtml()}
           <p class="pkhint" id="pkHint">&nbsp;<button id="pkReset" hidden>${t('pick.reset')}</button></p>
-          <div class="fs" style="margin-top:6px">
+          <div class="fs pl" style="margin-top:6px">
             <input type="range" id="fs" min="20" max="96" step="1">
             <input type="number" id="fsn" min="12" max="200" step="1">
             <span class="sw" id="weight">
               <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
           </div>
-          <label>${t('text.source')}<span class="sw" id="swSrc">
-            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
-          <div class="fs">
-            <input type="text" id="sp" placeholder="${t('text.sourcePrefixPh')}" style="width:64px;padding:5px 6px;font-size:12px">
-            <input type="text" id="s" style="flex:1">
+          <label>${t('text.title')}</label>
+          <input type="text" id="ti" placeholder="${t('text.titlePh')}">
+          <div class="fs pl" style="margin-top:6px">
+            <input type="range" id="ts" min="20" max="140" step="1">
+            <input type="number" id="tsn" min="12" max="300" step="1">
+            <span class="sw" id="tw">
+              <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
           </div>
-          <label>${t('text.date')}<span class="sw" id="swDate">
-            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
-          <input type="text" id="d">
-          <label>${t('text.header')}<span class="sw" id="swHead">
-            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
-          <input type="text" id="hd" placeholder="${t('text.headerPh')}">
-          <label>${t('text.rules')}</label>
-          <div class="row">
-            <button id="rHead" style="flex:1">${t('text.ruleHead')}</button>
-            <button id="rTitle" style="flex:1">${t('text.ruleTitle')}</button>
-            <button id="rFoot" style="flex:1">${t('text.ruleFoot')}</button>
+          <div class="rws">
+            <div class="rw"><span>${t('text.source')}</span><input type="text" class="mini" id="sp" placeholder="${t('text.sourcePrefixPh')}"><input type="text" id="s"><button class="tg" id="swSrc" aria-label="${t('text.source')}"><u></u></button></div>
+            <div class="rw"><span>${t('text.date')}</span><input type="text" id="d"><button class="tg" id="swDate" aria-label="${t('text.date')}"><u></u></button></div>
+            <div class="rw"><span>${t('text.header')}</span><input type="text" id="hd" placeholder="${t('text.headerPh')}"><button class="tg" id="swHead" aria-label="${t('text.header')}"><u></u></button></div>
           </div>
+          <div class="bx" id="orientIn"></div>
         </div>
 
-        <div class="pane" data-p="paper">
+        <div class="pane" data-p="paper"><div id="paperHome"><div id="paperBox">
           <div class="sub">${t('paper.builtin')}</div><div class="grid" id="paperBuiltin"></div>
           <div class="sub" id="packHd">${t('paper.pack')}</div><div class="grid" id="paperPack"></div>
           <div class="sub">${t('paper.mine')}</div><div class="grid" id="paperMine"></div>
           <label>${t('paper.bright')}</label>
           <div class="fs"><input type="range" id="pl" min="-50" max="50" step="1">
             <span class="val" id="plv"></span></div>
-        </div>
+        </div></div></div>
 
         <div class="pane" data-p="font">
-          <div class="sub">${t('font.body')}</div><div class="flist" id="font"></div>
-          <div id="flBox"${init.fontUrls ? ' hidden' : ''}><div class="fs" style="margin-top:6px">
-            <input type="text" id="fl" placeholder="${t('font.linkPh')}" aria-label="${t('font.linkPh')}" style="flex:1;padding:5px 7px;font-size:12px">
-            <button id="flGo" style="padding:6px 9px;border:1px solid var(--line);
-                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('font.linkGo')}</button>
-          </div>
-          <p class="pkhint">${t('font.linkHint')}</p></div>
-          <div class="sub">${t('font.latin')}</div><div class="flist" id="latin"></div>
-          <div class="sub">${t('font.title')}</div><div class="flist" id="swTitleFont"></div>
+          <div class="bx" style="margin-bottom:14px"><div class="sub">${t('font.whose')}</div><div class="chips"><span class="bLock"><button data-k="font">${t('font.mineOn')}</button></span><span class="bre" data-ks="font"></span></div></div>
+          <div class="ctr"><span class="seg" id="fTgt"><button data-v="font" aria-pressed="true">${t('font.tBody')}</button><button data-v="swTitleFont" aria-pressed="false">${t('font.tTitle')}</button><button data-v="latin" aria-pressed="false">${t('font.tLatin')}</button></span></div>
+          <div class="flist" id="font"></div>
+          <div class="flist" id="swTitleFont" hidden></div>
+          <div class="flist" id="latin" hidden></div>
+          <details class="fold" id="fMiss"><summary><span id="fMissN"></span></summary><div class="flist" id="fontMiss"></div></details>
+          <details class="fold" id="fAdd"><summary>${t('font.addFold')}</summary>
+            <div class="flist" id="fontAdd"></div>
+            <div id="flBox"${init.fontUrls ? ' hidden' : ''}><div class="fs" style="margin-top:6px">
+              <input type="text" id="fl" placeholder="${t('font.linkPh')}" aria-label="${t('font.linkPh')}" style="flex:1;padding:5px 7px;font-size:12px">
+              <button id="flGo" style="padding:6px 9px;border:1px solid var(--line);
+                      background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('font.linkGo')}</button>
+            </div>
+            <p class="pkhint">${t('font.linkHint')}</p></div>
+          </details>
         </div>
 
-        <div class="pane" data-p="ink">
+        <div class="pane" data-p="ink"><div id="inkHome"><div id="inkBox">
           <label>${t('ink.body')}</label><div class="row inks" id="ink"></div>
-          <label>${t('ink.meta')}</label><div class="row inks" id="metaInk"></div>
-          <label>${t('ink.quote')}</label><div class="row inks" id="quoteInk"></div>
           <label>${t('ink.custom')}<span class="sw"><span style="font-size:10px">${t('ink.customHint')}</span></span></label>
           <div class="fs">
             <input type="color" id="ck">
@@ -7095,6 +7298,9 @@ function openPanel(text, init = {}){
           <label>${t('ink.bright')}</label>
           <div class="fs"><input type="range" id="il" min="-50" max="50" step="1">
             <span class="val" id="ilv"></span></div>
+          </div></div>
+          <label>${t('ink.meta')}</label><div class="row inks" id="metaInk"></div>
+          <label>${t('ink.quote')}</label><div class="row inks" id="quoteInk"></div>
         </div>
 
         <div class="pane" data-p="layout">
@@ -7112,8 +7318,14 @@ function openPanel(text, init = {}){
             <button data-v="0">${t('dir.horizontal')}</button><button data-v="1">${t('dir.vertical')}</button></span></label>
           <label>${t('layout.bodyAlign')}</label><div class="row" id="align"></div>
           <label>${t('layout.titleAlign')}</label><div class="row" id="talign"></div>
-          <label>${t('layout.orient')}</label><div class="row" id="orient"></div>
+          <div id="orientHome"><div id="orientBox"><label>${t('layout.orient')}</label><div class="row" id="orient"></div></div></div>
           <label>${t('layout.pages')}</label><div class="row" id="pagesRow"></div>
+          <label>${t('text.rules')}</label>
+          <div class="row">
+            <button id="rHead" style="flex:1">${t('text.ruleHead')}</button>
+            <button id="rTitle" style="flex:1">${t('text.ruleTitle')}</button>
+            <button id="rFoot" style="flex:1">${t('text.ruleFoot')}</button>
+          </div>
           <label>${t('layout.offset')}<span class="sw"><span style="font-size:10px">${t('layout.offsetHint')}</span></span></label>
           <div class="fs">
             <span class="val" id="offv" style="width:auto"></span>
@@ -7123,19 +7335,20 @@ function openPanel(text, init = {}){
         </div>
 
         ${blindPaneHtml()}
-        <label style="margin:14px 0 -6px">${t('act.bare')}<span class="sw" id="bare"><button data-v="0">${t('sw.off')}</button><button data-v="1">${t('sw.on')}</button></span></label>
-        <div class="acts">
+        </div>
+        <div class="foot">
           <button class="save" id="save">${t('act.save')}</button>
           <button class="copy" id="copy">${t('act.copy')}</button>
+          <button class="tg" id="bare" title="${t('act.bare')}"><u></u>${t('act.bareShort')}</button>
         </div>
-        <div class="acts"><button class="close" id="close">${t('act.close')}</button></div>
-        <div class="tip" id="tip"></div>
       </div>
       <div class="view">
-        ${blindHtml()}
-        ${fullHtml()}
+        <div class="count" id="count"></div>
         <div class="pages" id="pgs"></div>
+        ${barHtml()}
+        <div class="tip" id="tip"></div>
       </div>
+      ${popsHtml(init)}
     </div>`;
   vvStop = trackViewport(mask);
   root.append(mask);
@@ -7151,7 +7364,7 @@ function openPanel(text, init = {}){
 
   // ── 画 ──────────────────────────────────────────────────────────
   let warmFor = null;
-  let plan = null, dragging = false, blindBar = null, full = null;
+  let plan = null, dragging = false, blindBar = null, full = null, frame = null;
   // 盲盒里自己挑了纸 / 字 / 墨，那一样就归自己，别的照旧听种子的
   const ownIt = k => { if (blindBar) blindBar.own(k); };
   // 拖的时候只重画已有的画布，绝不重建 DOM ——
@@ -7228,7 +7441,7 @@ function openPanel(text, init = {}){
         wrapEl.onclick = () => { selected = i; markSel(); };
         box.append(wrapEl); pageCanvases.push(cv);
       });
-      { const cols = Math.min(plan.pages.length, 3), rows = Math.ceil(plan.pages.length / cols); mask.style.setProperty('--need', `calc((100vw - 24px) * ${(plan.H / plan.W / cols * rows).toFixed(4)})`); }
+      box.dataset.n = plan.pages.length;
       if (selected >= plan.pages.length) selected = plan.pages.length - 1;
       markSel();
       // 张数、尺寸、以及「没照你说的办」的时候必须说出来，不能默默给个别的结果
@@ -7242,19 +7455,23 @@ function openPanel(text, init = {}){
       q('#count').textContent =
         t('count.pages', { n: plan.pages.length, w: plan.W, h: plan.H, ew: plan.W*DPR, eh: plan.H*DPR })
         + (notes.length ? t('count.notesGlue') + notes.join(t('count.notesJoin')) : '');
+      if (notes.length) q('#count').dataset.note = '1'; else delete q('#count').dataset.note;
+      mask.style.setProperty('--ar', (S0.w / S0.h).toFixed(3));
       // 盲盒可能抽中一张还没解码完的信纸：先垫纯色，解完再画一次
       if (plan.blind && plan.blind.pal.paper){
         const im = groundPhoto({ paper: plan.blind.pal.paper, orient: st.orient });
         if (im && !im.complete) im.addEventListener('load', draw, { once: true });
       }
       if (blindBar) blindBar.refresh(plan);
+      if (frame) frame.setMode(st.blind ? 'box' : 'plain');
       if (rough) fineSoon();
       prime(); if (warmFor !== st.title + st.text){ warmFor = st.title + st.text; prewarm(); }
     } catch (e){ tipEl.textContent = t('count.renderFail', { msg: e.message }); }
   };
   // 打字的时候盲盒别一字一画（一张要一两百毫秒），停手再画
   let typingTimer;
-  const drawTyping = () => { clearTimeout(typingTimer); if (st.blind) typingTimer = setTimeout(draw, 240); else draw(); };
+  let typedAt = 0;
+  const drawTyping = () => { typedAt = Date.now(); clearTimeout(typingTimer); if (st.blind) typingTimer = setTimeout(draw, 240); else draw(); };
   const markSel = () => mask.querySelectorAll('.pg').forEach(el =>
     el.setAttribute('aria-selected', +el.dataset.i === selected));
 
@@ -7361,6 +7578,7 @@ function openPanel(text, init = {}){
   function buildPresets(){
     const box = q('#presets'); box.textContent = '';
     for (const p of allPresets()){
+      if (p.style.blind) continue;      // 盲盒的在「♡ 常用」里
       const b = document.createElement('button');
       b.dataset.v = p.id; b.textContent = tName('preset', p.id, p.name);
       const mine = (cfg('presets') || []).some(x => x.id === p.id);
@@ -7395,13 +7613,6 @@ function openPanel(text, init = {}){
     tipEl.textContent = t('preset.saved', { name });
   };
 
-  // 标签页
-  q('#tabs').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    mask.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-pressed', x === b));
-    mask.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.p === b.dataset.v));
-    if (blindBar) blindBar.editing(b.dataset.v === 'box');
-  });
   q('#tw').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     st.titleWeight = +b.dataset.v; setCfg('titleWeight', st.titleWeight); sync(); draw();
@@ -7417,19 +7628,16 @@ function openPanel(text, init = {}){
   });
 
   q('#lang').onclick = e => {
-    if (!e.target.closest('button')) return;
-    const { resume, ...rest } = init, tab = mask.querySelector('#tabs button[aria-pressed=true]');
+    const b = e.target.closest('button'); if (!b || b.dataset.v === (studioLocale === 'en' ? 'en' : 'zh-CN')) return;
+    const { resume, ...rest } = init;
     Object.assign(st, { text: q('#t').value, title: q('#ti').value, source: q('#s').value, date: q('#d').value, headText: q('#hd').value, sourcePrefix: q('#sp').value });
-    setCfg('uiLang', studioLocale === 'en' ? 'zh-CN' : 'en');
-    document.removeEventListener('keydown', esc); pick.dispose(); full.dispose(); clearTimeout(fineTimer); clearTimeout(typingTimer);
-    openPanel(st.text, { ...rest, resume: { st, tab: tab ? tab.dataset.v : 'text', blind: blindBar.state(), full: full.state() } });
+    setCfg('uiLang', b.dataset.v);
+    document.removeEventListener('keydown', esc); pick.dispose(); full.dispose(); frame.dispose(); blindBar.dispose(); clearTimeout(fineTimer); clearTimeout(typingTimer);
+    openPanel(st.text, { ...rest, resume: { st, frame: frame.state(), blind: blindBar.state(), full: full.state() } });
   };
 
-  const mkSwitch = (sel, key) => q(sel).addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    st[key] = b.dataset.v === '1'; setCfg(key, st[key]); sync(); draw();
-  });
-  mkSwitch('#swSrc', 'showSource'); mkSwitch('#swDate', 'showDate'); mkSwitch('#swHead', 'showHeader');
+  for (const [sel, key] of [['#swSrc', 'showSource'], ['#swDate', 'showDate'], ['#swHead', 'showHeader']])
+    q(sel).onclick = () => { st[key] = !st[key]; setCfg(key, st[key]); sync(); draw(); };
   // 三道线：按钮本身就是开关，亮着＝要
   for (const [sel, key] of [['#rHead','headRule'], ['#rTitle','titleRule'], ['#rFoot','footRule']]){
     q(sel).onclick = () => { st[key] = !st[key]; setCfg(key, st[key]); sync(); draw(); };
@@ -7616,13 +7824,14 @@ function openPanel(text, init = {}){
   };
   function buildFonts(){
     // 正文字体
-    const box = q('#font'); box.textContent = '';
+    const box = q('#font'), miss = q('#fontMiss'); box.textContent = ''; miss.textContent = '';
     for (const f of FONTS){
       const ok = fontAvailable(f);
       const b = fontRow(f.id, tName('font', f.id, f.name), ok ? cjkStack(f.id) : null, ok ? '' : t('font.hintMissing'), !ok);
       if (!ok) b.title = t('font.missingTitle');
-      box.append(b);
+      (ok ? box : miss).append(b);
     }
+    q('#fMissN').textContent = t('font.missFold', { n: miss.children.length }); q('#fMiss').hidden = !miss.children.length;
     for (const f of cfg('myFonts')){
       const away = f.idb && !loadedCustom.has(f.id), b = fontRow(f.id, f.name, `"${f.id}"`, f.faces ? t('font.hintLink') : away ? t('font.hintAway') : t('font.hintCustom'), away);
       b.title = t('tip.rightDelete');
@@ -7667,7 +7876,7 @@ function openPanel(text, init = {}){
     // 标题字体：中文和英文都能挑（挑了英文字，汉字会自动落回正文的中文字体）
     fillFonts(q('#swTitleFont'), t('font.sameAsBody'), false);
 
-    const add = document.createElement('button');
+    const add = document.createElement('button'); q('#fontAdd').textContent = '';
     add.textContent = t('font.add'); add.style.fontSize = '12px';
     add.title = t('font.addTitle');
     add.onclick = async () => {
@@ -7678,22 +7887,24 @@ function openPanel(text, init = {}){
       for (const f of files){ tipEl.textContent = t('font.reading', { name: f.name }); try { got.push(...await fontFromBytes(f.name, await readFile(f), askFonts)); } catch (e){ bad.push(fontSay(e, f.name)); } }
       fontDone(got, bad);
     };
-    box.append(add);
-
-    const pickFont = (el, key) => el.addEventListener('click', e => {
-      const b = e.target.closest('button'); if (!b || !b.dataset.v) return;
-      if (b.dataset.off === '1'){
-        tipEl.textContent = t('font.notInstalledTip');
-        return;
-      }
-      st[key] = b.dataset.v; setCfg(key, st[key]); ownIt('font'); sync(); draw();
-    });
-    pickFont(box, 'font'); pickFont(q('#latin'), 'latinFont'); pickFont(q('#swTitleFont'), 'titleFont');
+    q('#fontAdd').append(add);
   }
+  // 监听只挂一回：单子会重建很多次，跟着重挂的话点一下要画好几遍
+  for (const [sel, key] of [['#font', 'font'], ['#latin', 'latinFont'], ['#swTitleFont', 'titleFont']]) q(sel).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !b.dataset.v) return;
+    if (b.dataset.off === '1'){ tipEl.textContent = t('font.notInstalledTip'); return; }
+    st[key] = b.dataset.v; setCfg(key, st[key]); ownIt('font'); sync(); draw();
+  });
+  q('#fontMiss').onclick = () => { tipEl.textContent = t('font.notInstalledTip'); };
+  q('#fTgt').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    q('#fTgt').querySelectorAll('button').forEach(x => { x.setAttribute('aria-pressed', String(x === b)); q('#' + x.dataset.v).hidden = x !== b; });
+    q('#fMiss').hidden = b.dataset.v !== 'font' || !q('#fontMiss').children.length;
+  };
 
-  q('#bare').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ st.noGround = b.dataset.v === '1'; sync(); draw(); } });
+  q('#bare').onclick = () => { st.noGround = !st.noGround; sync(); draw(); };
   const sync = () => {
-    q('#bare').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.v === '1') === st.noGround));
+    for (const [sel, on] of [['#bare', st.noGround], ['#swSrc', st.showSource], ['#swDate', st.showDate], ['#swHead', st.showHeader]]) q(sel).setAttribute('aria-pressed', String(!!on));
     mask.classList.toggle('bare', st.noGround);
     pick.refresh();
     const marks = [['#orient', st.orient], ['#pagesRow', st.pages],
@@ -7702,9 +7913,7 @@ function openPanel(text, init = {}){
                    ['#align', st.align], ['#talign', st.titleAlign], ['#vert', st.vertical?'1':'0'], ['#tvert', st.titleVertical?'1':'0'],
                    ['#metaInk', st.metaInk],
                    ['#quoteInk', st.quoteInk],
-                   ['#latin', st.latinFont], ['#swTitleFont', st.titleFont], ['#tw', st.titleWeight],
-                   ['#swSrc', st.showSource?'1':'0'], ['#swDate', st.showDate?'1':'0'],
-                   ['#swHead', st.showHeader?'1':'0']];
+                   ['#latin', st.latinFont], ['#swTitleFont', st.titleFont], ['#tw', st.titleWeight]];
     for (const [sel, val] of marks)
       mask.querySelectorAll(sel + ' button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === String(val)));
     q('#s').disabled = !st.showSource; q('#sp').disabled = !st.showSource;
@@ -7753,7 +7962,7 @@ function openPanel(text, init = {}){
   q('#ti').oninput = e => { pick.edited('title', e); drawTyping(); };
   q('#s').oninput = drawTyping; q('#d').oninput = drawTyping;
   blindBar = mountBlind({ resume: back && back.blind, mask, st, draw, sync, alive, tip: m => { tipEl.textContent = m; },
-    openTab: v => { const b = q('#tabs button[data-v="' + v + '"]'); if (b.getAttribute('aria-pressed') !== 'true') b.click(); },
+    tab: () => frame ? frame.tab() : '', keptOpen: () => !q('#keptPop').hidden, shutPops: () => frame && frame.shut(), typing: () => Date.now() - typedAt < 700,
     // 拖着的时候只重画第一张，不重建预览（重建的话手底下那层会被销毁，拖动当场断掉）
     repaint: draft => {
       plan = planPages(st); if (!plan.blind || !pageCanvases[0]) return null;
@@ -7770,13 +7979,20 @@ function openPanel(text, init = {}){
       setCfg('presets', (cfg('presets') || []).concat([{ id: 'ps' + Date.now(), name, style }]));
       buildPresets();
     } });
-  full = mountFull({ resume: back && back.full, mask, alive, tipEl, changed: () => fineSoon() });
+  full = mountFull({ resume: back && back.full, mask, alive, changed: () => fineSoon(), low: () => frame && frame.sheet('low') });
+  frame = mountFrame({ mask, alive, resume: back && back.frame,
+    moved: [['#orientBox', '#orientHome', '#orientIn'], ['#paperBox', '#paperHome', '#palPaper'], ['#inkBox', '#inkHome', '#palInk']],
+    onTab: (v, m) => { blindBar.editing(m === 'box' && v !== 'text'); blindBar.thumbs(); },
+    onMode: m => { tipEl.textContent = ''; if (m === 'plain') blindBar.off(); else blindBar.on(); } });
+  q('#pbody').addEventListener('scroll', () => blindBar.kick(), { passive: true });
+  q('#keptPop').addEventListener('scroll', () => blindBar.kick(), { passive: true });
+  q('#bMine').addEventListener('click', () => blindBar.thumbs());
   q('#hd').oninput = () => { setCfg('headText', q('#hd').value); drawTyping(); };
 
   const close = () => {
     // 自己的 Esc 监听无条件先摘：被新面板顶替后残留的那份也借这条路自清
     document.removeEventListener('keydown', esc);
-    pick.dispose(); full.dispose();
+    pick.dispose(); full.dispose(); frame.dispose(); blindBar.dispose();
     if (!alive()) return;
     fullLeave();
     if (vvStop) { vvStop(); vvStop = null; }
@@ -7791,7 +8007,7 @@ function openPanel(text, init = {}){
   mask.addEventListener('pointerdown', e => { downOnMask = e.target === mask; }, true);
   mask.onclick = e => { if (e.target === mask && downOnMask) close(); };
   // 正选着字的时候，Esc 先放开选中的字，再退全屏，再按一次才关面板
-  const esc = e => { if (e.key === 'Escape' && !(alive() && (pick.drop() || blindBar.drop() || full.drop()))) close(); };
+  const esc = e => { if (e.key === 'Escape' && !(alive() && (frame.shut() || pick.drop() || blindBar.drop() || full.drop()))) close(); };
   document.addEventListener('keydown', esc);
 
   // ── 存 / 复制 ───────────────────────────────────────────────────
@@ -7845,10 +8061,8 @@ function openPanel(text, init = {}){
 
   applyTheme();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch {}
-  q('#tabs').querySelector('button').click();      // 默认落在「文」这一屏
-  if (back && back.tab !== 'box') q(`#tabs button[data-v="${back.tab}"]`).click();
+  frame.setMode(st.blind ? 'box' : 'plain');
   buildPapers(); buildFonts(); buildInks(); buildPresets(); sync(); draw();
-  if (back && back.tab === 'box' && st.blind) q('#tabs button[data-v="box"]').click();      // 「盒」那一屏要等盲盒画出来才有
   if (blank && !back) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
   ensureCustomFonts().then(() => { if (!alive()) return; dropFontProbes(); buildFonts(); sync(); draw(); prewarm(); });
   // 嵌入方捆的字（一款一二十兆）可能这会儿才下完：单子刷新；正拆着盲盒就不动那张脸

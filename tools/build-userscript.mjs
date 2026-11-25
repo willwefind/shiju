@@ -51,6 +51,8 @@ export const ORDER = [
   'studio/studio-blind.js',  // 版式盲盒的按钮条
   'studio/studio-full.js',   // 全屏
   'studio/studio-fonts.js',  // 自己加字：文件 / 字体包 / 链接
+  'studio/studio-thumbs.js', // 小图
+  'studio/studio-frame.js',  // 骨架：两个模式、标签、抽屉
   'studio/studio-shell.js',  // Shadow DOM 面板全部界面
   'adapters/selection.js',   // 选区监听/Alt+Q/三指轻点
   'adapters/sillytavern.js', // 酒馆扩展入口

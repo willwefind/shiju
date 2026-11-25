@@ -2,49 +2,30 @@
 //  6c. 版式盲盒的界面：按钮条（常驻在预览上方）＋「盒」那一屏（接着改）＋ 纸上直接拖
 // ════════════════════════════════════════════════════════════════════
 const BLIND_CSS = `
-.bbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:0 0 auto}
-.bbar [hidden],.tabs [hidden],.bx [hidden]{display:none!important}
-.bbar button{border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;
-     font-size:12px;padding:6px 13px;cursor:pointer;letter-spacing:.06em}
-.bbar button.go{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg);padding:7px 18px;letter-spacing:.14em}
-.bbar button.ic{padding:6px 11px}
-.bbar button:disabled,.bx button:disabled{opacity:.35;cursor:default}
-.bbar .kept{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:5px;max-height:92px;overflow:auto}
-.bbar .kept span{display:inline-flex;align-items:stretch;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--btn)}
-.bbar .kept button{border:0;border-radius:0;padding:4px 4px 4px 11px;font-size:11px}
-.bbar .kept button+button{padding:4px 9px 4px 5px;color:var(--dim)}
-.bbar .nm{;color:var(--fg);letter-spacing:.06em;margin:0 4px;min-width:0}
-.bx .acc{border-top:1px solid var(--line);margin-top:0}
-.bx .acc:first-of-type{margin-top:12px}
-.bx .acc:last-of-type{border-bottom:1px solid var(--line)}
-.bx summary{cursor:pointer;list-style:none;padding:10px 2px;font-size:12px;color:var(--fg);letter-spacing:.06em;display:flex;gap:8px;align-items:baseline}
-.bx summary::-webkit-details-marker{display:none}
-.bx summary::after{content:'+';margin-left:auto;color:var(--dim)}
-.bx .acc[open] summary::after{content:'–'}
-.bx summary em{font-style:normal;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.bx .accin{padding:0 0 12px}
-.bx .chips{display:flex;flex-wrap:wrap;gap:4px}
-.bx .chips button{border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;font-size:11px;padding:3px 9px;cursor:pointer}
-.bx .chips button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg)}
-.bx .chips button.re::before{content:"↻ ";color:var(--dim)}
-.bx .pals{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
-.bx .pals button{height:24px;padding:0;border:1px solid var(--line);border-radius:4px;cursor:pointer;overflow:hidden;display:flex}
-.bx .pals button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
-.bx .pals i{flex:1;height:100%}
-.bx .four{display:flex;gap:10px;margin-top:7px;font-size:11px;color:var(--dim)}
-.bx .four span{display:flex;gap:4px;align-items:center}
-.bx input[type=color]{width:26px;height:22px;padding:0;border:1px solid var(--line);border-radius:3px;background:var(--btn);cursor:pointer}
-.bx .one{border:1px solid var(--on-bg);border-radius:5px;padding:9px;background:var(--field);margin-top:7px}
-.bx .one .fs{margin-top:5px;font-size:11px;color:var(--dim)}
-.bx .one .fs span{flex:0 0 34px}
-.bx .amts{margin-top:10px}
-.bx .amts .fs{margin-top:4px;font-size:11px;color:var(--dim)}
-.bx .amts .fs>span:first-child{flex:0 0 62px}
-.bx .dots{display:flex;gap:6px;align-items:center;margin-top:7px}
-.bx .dots button{width:20px;height:20px;border-radius:50%;border:1px solid rgba(128,128,128,.4);padding:0;cursor:pointer}
-.bx .dots button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
-.bx .two{display:flex;gap:5px}
-.bx .two button{flex:1;border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:4px;font-size:12px;padding:6px 4px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.chips button{border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:999px;font-size:12px;padding:4px 11px;cursor:pointer}
+.chips button[aria-pressed=true]{background:var(--on-bg);color:var(--on-fg);border-color:var(--on-bg)}
+.chips button.re::before{content:"↻ ";color:var(--dim)}
+.chips .bre,.chips .bLock{display:contents}
+.bsec{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--fg);margin:0 0 4px;letter-spacing:.04em}
+.bsec:not(:first-child){margin-top:24px}
+.bsec .chips button{font-size:11px;padding:3px 9px}
+.amts.fs{margin:4px 0 12px;font-size:12px;color:var(--dim)}
+.pals{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.pals button{height:32px;padding:0;border:1px solid var(--line);border-radius:5px;cursor:pointer;overflow:hidden;display:flex}
+.pals button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
+.pals i{flex:1;height:100%}
+.four{display:flex;gap:14px;font-size:12px;color:var(--dim)}
+.four span{display:flex;gap:5px;align-items:center}
+.four input,.dots input{width:28px;height:24px;padding:0;border:1px solid var(--line);border-radius:3px;background:var(--btn);cursor:pointer}
+.one{border:1px solid var(--on-bg);border-radius:6px;padding:10px;background:var(--field);margin:2px 0 16px}
+.one .fs{margin-top:5px;font-size:11px;color:var(--dim)}
+.one .fs span{flex:0 0 34px}
+.dots{display:flex;gap:6px;align-items:center;margin-top:7px}
+.dots button{width:20px;height:20px;border-radius:50%;border:1px solid rgba(128,128,128,.4);padding:0;cursor:pointer}
+.dots button[aria-pressed=true]{outline:2px solid var(--on-bg);outline-offset:1px}
+.two{display:flex;gap:5px}
+.two button{flex:1;border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:4px;font-size:12px;padding:6px 4px;cursor:pointer}
 .bov{position:absolute;inset:0;outline:none}
 .bsel{position:absolute;border:1.5px dashed #fff;box-shadow:0 0 0 1.5px rgba(185,32,11,.8);pointer-events:none;border-radius:3px}
 .bsel i,.bsel u{position:absolute;pointer-events:auto;width:18px;height:18px;border-radius:50%;background:#fff;border:1px solid rgba(185,32,11,.85);
@@ -53,36 +34,20 @@ const BLIND_CSS = `
 .bsel u{right:-9px;top:-9px;cursor:pointer}
 @media (pointer: coarse){ .bov{pointer-events:none} .mask.bedit .bov{pointer-events:auto;touch-action:none} .bsel i,.bsel u{width:26px;height:26px;line-height:24px} }
 @media (max-width: 760px){
-  .bbar{gap:4px}
-  .bbar button{padding:9px 9px;letter-spacing:0}
-  .bbar button.go{padding:10px 14px;letter-spacing:.06em}
-  .bbar .nm{flex:1 1 100%;order:5}
-  .mask.blind .view{max-height:62%}
-  .bx .chips button{padding:8px 12px;font-size:12px}
-  .bx .pals button{height:32px}
+  .chips button{padding:8px 13px}
+  .pals button{height:38px}
+  .dots button{width:28px;height:28px}
 }
 `;
-const blindHtml = () => `
-  <div class="bbar" id="bbar">
-    <button class="go" id="bGo" title="${t('blind.openTitle')}">${t('blind.open')}</button>
-    <button class="ic" id="bPrev" title="${t('blind.prev')}" aria-label="${t('blind.prev')}" hidden>‹</button>
-    <button class="ic" id="bNext" title="${t('blind.next')}" aria-label="${t('blind.next')}" hidden>›</button>
-    <button id="bEdit" hidden>${t('blind.edit')}</button>
-    <button id="bKeep" title="${t('blind.keepTitle')}" hidden>${t('blind.keep')}</button>
-    <button id="bOff" hidden>${t('blind.off')}</button>
-    <button id="bMine" aria-expanded="false" hidden></button>
-    <span class="nm" id="bName" hidden></span>
-    <div class="kept" id="bKept" hidden></div>
-  </div>`;
 // 方案分三堆：低声的、意象、响亮的
 const B_COMP_GROUPS = () => [['quiet', BLIND_COMPS.filter(c => c.q && !c.g && c.id !== 'image' && c.id !== 'youme')], ['warm', BLIND_MORE], ['long', BLIND_LONG], ['image', BLIND_COMPS.filter(c => c.id === 'image' || c.id === 'youme')], ['jp', BLIND_STYLE.filter(c => c.g === 'jp')], ['intl', BLIND_STYLE.filter(c => c.g === 'intl')], ['pop', BLIND_STYLE.filter(c => c.g === 'pop')], ['loud', BLIND_COMPS.filter(c => !c.q && !c.long && !c.g && !BLIND_MORE.includes(c))]];
-const bAcc = (k, inner) => `<details class="acc" data-k="${k}"><summary>${t('blind.s_' + k)}<em id="bNow_${k}"></em></summary><div class="accin">${inner}</div></details>`;
-const blindPaneHtml = () => `
-  <div class="pane bx" data-p="box">
-    <div class="two"><button id="bUndo">${t('blind.undo')}</button><button id="bRedo">${t('blind.redo')}</button></div>
-    <div class="sub">${t('blind.reroll')}</div><div class="chips" id="bRe"></div>
-    <div class="amts">${['fx', 'post'].map(k => `<div class="fs" data-k="${k}"><span>${t('blind.amt_' + k)}</span><input type="range" min="0" max="100" step="1" aria-label="${t('blind.amt_' + k)}"><span class="val"></span></div>`).join('')}</div>
-    <div class="one" id="bOne" hidden>
+// 气氛分几堆（跟 README 那张表一个分法）
+const B_LOOK_GROUPS = [['all', null], ['air', ['mist', 'afterglow', 'over', 'night', 'lamp', 'darkroom', 'neon', 'dive', 'gradient', 'pearl']], ['tex', ['first', 'watercolor', 'paper', 'press', 'film', 'sandblast', 'signal']], ['lens', ['swirl', 'long', 'glass', 'negative', 'subtitle']], ['word', ['vanish', 'cover', 'flat']], ['print', ['bokashi', 'benday']]];
+const bRe = ks => `<span class="bre" data-ks="${ks}"></span>`;
+const bAmt = k => `<div class="fs amts" data-k="${k}"><span>${t('blind.amt')}</span><input type="range" min="0" max="100" step="1" aria-label="${t('blind.amt_' + k)}"><span class="val"></span></div>`;
+// 在纸上点中的那一块：哪一屏都在最上头
+const blindOneHtml = () => `
+    <div class="bx"><div class="one" id="bOne" hidden>
       <div class="pkh"><b id="bOneName"></b><button id="bOneDel">${t('blind.del')}</button></div>
       <div id="bSwapBox"><div class="chips" id="bSwap"></div></div>
       <div id="bLineBox"><div class="chips" id="bFeel"></div><div class="chips" id="bMode" style="margin-top:4px"></div></div>
@@ -92,20 +57,28 @@ const blindPaneHtml = () => `
       <div class="fs" data-k="rot"><span>${t('blind.turn')}</span><input type="range" min="-180" max="180" step="1"></div>
       <div class="fs" data-k="t"><span>${t('blind.thick')}</span><input type="range" min="1" max="100" step="1"></div>
       <div class="two" style="margin-top:8px"><button id="bFront"></button><button id="bReseed">${t('blind.reseed')}</button><button id="bDup">${t('blind.dup')}</button></div>
-    </div>
-    <p class="pkhint" id="bTip">${t('blind.editHint')}</p>
-    ${bAcc('comp', '<div id="bComp"></div>')}
-    ${bAcc('look', '<div class="chips" id="bLook"></div>')}
-    ${bAcc('pal', `<div class="two"><button id="bTune">${t('blind.tune')}</button></div>
-      <div class="four" id="bFour">${['g', 'i', 'a', 'b'].map(k => `<span><input type="color" data-k="${k}">${t('blind.c' + k)}</span>`).join('')}</div>
-      <div id="bPals"></div>
-      <div class="sub">${t('blind.lock')}</div><div class="chips" id="bLock"><button data-k="paper">${t('blind.paper')}</button><button data-k="font">${t('blind.font')}</button><button data-k="ink">${t('blind.ink')}</button></div>`)}
-    ${bAcc('fx', `<div class="chips" id="bFx"></div><div class="sub">${t('blind.more')}</div><div class="chips" id="bFx2"></div>`)}
-    ${bAcc('post', '<div class="chips" id="bPost"></div>')}
-    ${bAcc('add', `<div class="chips" id="bItems"></div><div id="bAdd"></div>`)}
-  </div>`;
+    </div></div>`;
+const blindPaneHtml = () => `
+  <div class="pane bx" data-p="comp"><div class="gs" id="bCompG"></div><div class="th" id="bComp"></div>
+    <div class="sub" style="margin-top:20px">${t('blind.reroll')}</div><div class="chips">${bRe('hero')}</div><p class="pkhint" id="bTip">${t('blind.editHint')}</p></div>
+  <div class="pane bx" data-p="look"><div class="gs" id="bLookG"></div><div class="th" id="bLook"></div></div>
+  <div class="pane bx" data-p="pal">
+    <div class="chips" style="margin-bottom:14px">${bRe('pal')}<button id="bTune">${t('blind.tune')}</button></div>
+    <div class="gs" id="bPalG"></div><div class="pals" id="bPals"></div>
+    <div class="sub" style="margin-top:18px">${t('blind.fourSub')}</div>
+    <div class="four" id="bFour">${['g', 'i', 'a', 'b'].map(k => `<span><input type="color" data-k="${k}">${t('blind.c' + k)}</span>`).join('')}</div>
+    <details class="fold" style="margin-top:20px"><summary>${t('blind.minePaper')}</summary><div class="chips bLock" style="display:flex"><button data-k="paper">${t('blind.usePaper')}</button></div><div id="palPaper"></div></details>
+    <details class="fold" style="margin-top:0"><summary>${t('blind.mineInk')}</summary><div class="chips bLock" style="display:flex"><button data-k="ink">${t('blind.useInk')}</button></div><div id="palInk"></div></details>
+  </div>
+  <div class="pane bx" data-p="feel">
+    <div class="bsec"><span>${t('blind.s_fx')}</span><span class="chips">${bRe('fx')}</span></div>${bAmt('fx')}
+    <div class="chips" id="bFx"></div><details class="fold"><summary>${t('blind.more')}</summary><div class="chips" id="bFx2"></div></details>
+    <div class="bsec"><span>${t('blind.s_post')}</span><span class="chips">${bRe('post')}</span></div>${bAmt('post')}
+    <div class="chips" id="bPost"></div>
+  </div>
+  <div class="pane bx" data-p="add"><div class="sub" style="margin-top:0">${t('blind.addNow')}</div><div class="chips" id="bItems"></div><div id="bAdd"></div></div>`;
 
-function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, openTab, ready }){
+function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, kept, tab, keptOpen, shutPops, typing }){
   const q = s => mask.querySelector(s);
   // 一个盒子 ＝ 它自己的一串改动；盒子之间前后翻，盒子里头一步一步撤
   const boxes = resume ? resume.boxes : []; let at = resume ? resume.at : -1, plan = null, sel = null, name = '', short = '', label = '', lookNow = '';
@@ -154,35 +127,35 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
   q('#bNext').onclick = () => { if (at < boxes.length - 1) jump(at + 1); };
   q('#bUndo').onclick = () => { const b = box(); if (b && b.i > 0){ b.i--; st.blind = b.hist[b.i]; lastTag = ''; apply(); } };
   q('#bRedo').onclick = () => { const b = box(); if (b && b.i < b.hist.length - 1){ b.i++; st.blind = b.hist[b.i]; lastTag = ''; apply(); } };
-  q('#bOff').onclick = () => { undress(); st.blind = null; sel = null; apply(); };
-  q('#bEdit').onclick = () => openTab('box');
+  // 换模式：回信纸不丢盒子，再进来还是刚才那一个
+  const off = () => { undress(); st.blind = null; sel = null; apply(); };
+  const on = () => { if (at >= 0 && boxes[at] && (q('#t').value.trim() || q('#ti').value.trim())) jump(at); else q('#bGo').onclick(); };
   // 常用版式：收下的时候把颜色也定死，以后换一段字、换一个版本，都还是它
-  let open = !!(resume && resume.open);
   const frozen = () => {
     const p = plan.blind, { cls, canon, big, hero, heroW, body, bodyW, meta, metaW } = p.fonts, own = st.blind.own || {};
     return { ...st.blind, pal: { ...p.pal }, keep: { turn: p.turn, room: p.room, ...(own.font ? {} : { face: { cls, canon, big, hero, heroW, body, bodyW, meta, metaW } }) } };
   };
   const setOf = p => { const s = {}; for (const k of ['orient', 'showHeader', 'showSource', 'showDate'].concat((p.style.blind.own || {}).font ? ['font', 'latinFont', 'titleFont'] : [])) if (k in p.style) s[k] = p.style[k]; return s; };
-  q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, frozen()); open = true; fillKept(); tip(t('blind.kept', { name: n })); };
+  q('#bKeep').onclick = () => { if (!plan || !plan.blind) return; const n = short.slice(0, 24); keep(n, frozen()); fillKept(); tip(t('blind.kept', { name: n })); };
+  let keptStamp = null;
   function fillKept(){
-    const list = kept.list(), box = q('#bKept'); box.textContent = ''; q('#bMine').hidden = !list.length; box.hidden = !list.length || !open;
-    q('#bMine').textContent = t('blind.mine', { n: list.length }); q('#bMine').setAttribute('aria-expanded', open && !!list.length);
-    for (const p of list){
-      const s = document.createElement('span'), b = document.createElement('button'), x = document.createElement('button');
-      b.textContent = p.name; b.title = t('blind.mineUse'); x.textContent = '×'; x.title = t('blind.del'); x.setAttribute('aria-label', t('blind.del')); s.append(b, x); box.append(s);
-      b.onclick = () => { const { text, title } = texts(); if (!(text.trim() || title.trim())){ tip(t('blind.empty')); return; } const set = setOf(p); dress(set); st.blind = blindFor({ ...p.style.blind }, text, title); sel = null; boxes.push({ hist: [st.blind], i: 0, set }); at = boxes.length - 1; lastTag = ''; apply(); if (plan && plan.blind && p.style.blind.comp && plan.blind.comp !== p.style.blind.comp) tip(t('blind.compNo', { name: t('bc.' + p.style.blind.comp) })); };
-      b.ondblclick = () => { const v = prompt(t('preset.renamePrompt'), p.name); if (v === null) return; kept.rename(p.id, v.trim().slice(0, 24) || p.name); fillKept(); };
-      x.onclick = () => { if (!confirm(t('preset.deleteConfirm', { name: p.name }))) return; kept.remove(p.id); fillKept(); };
+    const list = kept.list(), stamp = list.map(p => p.id + p.name).join(); if (stamp === keptStamp) return; keptStamp = stamp;
+    const box = q('#bKept'); box.textContent = ''; q('#bKeptNone').hidden = !!list.length;
+    for (const p of list.slice().reverse()){
+      const d = document.createElement('div'), b = document.createElement('button'), x = document.createElement('button');
+      d.className = 'ti'; d.dataset.id = p.id; b.append(document.createElement('canvas'), document.createTextNode(p.name)); b.title = t('blind.mineUse'); x.className = 'x'; x.textContent = '×'; x.title = t('blind.del'); x.setAttribute('aria-label', t('blind.del')); d.append(b, x); box.append(d);
+      b.onclick = () => { const { text, title } = texts(); if (!(text.trim() || title.trim())){ tip(t('blind.empty')); return; } const set = setOf(p); dress(set); st.blind = blindFor({ ...p.style.blind }, text, title); sel = null; boxes.push({ hist: [st.blind], i: 0, set }); at = boxes.length - 1; lastTag = ''; shutPops(); apply(); if (plan && plan.blind && p.style.blind.comp && plan.blind.comp !== p.style.blind.comp) tip(t('blind.compNo', { name: t('bc.' + p.style.blind.comp) })); };
+      b.ondblclick = () => { const v = prompt(t('preset.renamePrompt'), p.name); if (v === null) return; kept.rename(p.id, v.trim().slice(0, 24) || p.name); fillKept(); thumbs(); };
+      x.onclick = () => { if (!confirm(t('preset.deleteConfirm', { name: p.name }))) return; kept.remove(p.id); fillKept(); thumbs(); };
     }
   }
-  q('#bMine').onclick = () => { open = !open; fillKept(); };
 
   // ── 单换一样 ────────────────────────────────────────────────────
-  for (const k of ['comp', 'look', 'pal', 'font', 'hero', 'fx', 'post']){
-    const b = document.createElement('button'); b.className = 're'; b.dataset.k = k; b.textContent = t('blind.re_' + k); q('#bRe').append(b);
-  }
-  q('#bRe').onclick = e => {
-    const b = e.target.closest('button'); if (!b || !st.blind) return;
+  mask.querySelectorAll('.bre').forEach(box => { for (const k of box.dataset.ks.split(',')){
+    const b = document.createElement('button'); b.className = 're'; b.dataset.k = k; b.textContent = t('blind.re_' + k); b.onclick = () => reroll(b); box.append(b);
+  } });
+  const reroll = b => {
+    if (!st.blind) return;
     const k = b.dataset.k, patch = { seeds: { ...(st.blind.seeds || {}), [k]: blindSeed() } };
     // 重掷某一样，就把人在这一样上定死的放开
     if (k === 'comp') Object.assign(patch, { comp: undefined, move: undefined, keep: undefined });
@@ -197,7 +170,7 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
 
   // ── 浓淡：效果（字上的）和修图（整张的）各一根 ──────────────────
   let amtWait = 0;
-  mask.querySelectorAll('.bx .amts input').forEach(inp => inp.oninput = () => {
+  mask.querySelectorAll('.amts input').forEach(inp => inp.oninput = () => {
     const k = inp.parentElement.dataset.k, v = +inp.value / 100; inp.nextElementSibling.textContent = inp.value + '%';
     if (!st.blind) return;
     const amt = { fx: 1, post: 1, ...(st.blind.amt || {}), [k]: v }; set({ amt }, 'amt' + k); lastAt = Date.now(); setCfg('blindAmt', amt.fx >= 1 && amt.post >= 1 ? null : amt);
@@ -244,22 +217,31 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
   const moveLayer = (i, patch, tag) => go({ move: { ...(st.blind.move || {}), [i]: { ...((st.blind.move || {})[i] || {}), ...patch } } }, tag);
 
   // ── 构图 / 配色 / 用我的 / 效果 / 修图 ──────────────────────────
-  for (const [g, cs] of B_COMP_GROUPS()){ const h = document.createElement('div'); h.className = 'sub'; h.textContent = t('blind.q_' + g); const r = document.createElement('div'); r.className = 'chips'; for (const c of cs) chip(r, c.id, t('bc.' + c.id)); q('#bComp').append(h, r); }
-  // 一次只摊开一栏
-  mask.querySelectorAll('.acc').forEach(d => d.addEventListener('toggle', () => { if (d.open) mask.querySelectorAll('.acc').forEach(o => { if (o !== d) o.open = false; }); }));
+  const groups = B_COMP_GROUPS(); let compG = 'warm', lookG = 'all';
+  const tabsOf = (sel, list, get, set) => { const box = q(sel); for (const [v, n] of list) chip(box, v, n); box.onclick = e => { const b = e.target.closest('button'); if (b) set(b.dataset.v); }; };
+  const mark = (sel, v) => q(sel).querySelectorAll('button').forEach(b => { const on = b.dataset.v === v; b.setAttribute('aria-pressed', String(on)); if (on) try { const p = b.parentElement; p.scrollLeft = Math.max(0, b.offsetLeft - p.clientWidth / 2 + b.offsetWidth / 2); } catch {} });
+  // 一格小图：头一格是「另掷一张」
+  const tile = (box, v, text) => { const d = document.createElement('div'), b = document.createElement('button'); d.className = 'ti'; b.dataset.v = v; if (v === 're'){ const s = document.createElement('span'); s.className = 're'; s.innerHTML = ICO.again; b.append(s); } else b.append(document.createElement('canvas')); b.append(document.createTextNode(text)); d.append(b); box.append(d); };
+  const buildComp = g => { compG = g; const box = q('#bComp'); box.textContent = ''; tile(box, 're', t('blind.again1')); for (const c of (groups.find(x => x[0] === g) || groups[0])[1]) tile(box, c.id, t('bc.' + c.id)); mark('#bCompG', g); if (label) press('#bComp', v => v === label); thumbs(); };
+  const buildLook = g => { lookG = g; const box = q('#bLook'); box.textContent = ''; tile(box, 're', t('blind.again1')); for (const k of (B_LOOK_GROUPS.find(x => x[0] === g)[1] || BLIND_LOOKS.map(k => k.id))) tile(box, k, t('bl.' + k)); mark('#bLookG', g); if (lookNow) press('#bLook', v => v === lookNow); thumbs(); };
+  tabsOf('#bCompG', groups.map(([g]) => [g, t('blind.q_' + g)]), () => compG, g => buildComp(g));
+  tabsOf('#bLookG', B_LOOK_GROUPS.map(([g]) => [g, t('blind.k_' + g)]), () => lookG, g => buildLook(g));
   q('#bComp').onclick = e => {
     const b = e.target.closest('button'); if (!b || !st.blind) return;
-    // 换一种方案：种子不动，换回来还是原来那张。点的就是正用着的那种，才另掷一张
-    const was = st.blind, again = plan && plan.blind && plan.blind.comp === b.dataset.v; set({ comp: b.dataset.v, move: undefined, ...(again ? { keep: undefined, seeds: { ...(was.seeds || {}), comp: blindSeed() } } : {}) });
+    // 换一种方案：种子不动，换回来还是原来那张。点的就是正用着的那种（或者「另掷一张」），才另掷
+    const was = st.blind, now = plan && plan.blind && plan.blind.comp, v = b.dataset.v === 're' ? now : b.dataset.v, again = v === now; if (!v) return;
+    set({ comp: v, move: undefined, ...(again ? { keep: undefined, seeds: { ...(was.seeds || {}), comp: blindSeed() } } : {}) });
     apply();
-    if (plan && plan.blind && plan.blind.comp !== b.dataset.v) tip(t('blind.compNo', { name: t('bc.' + b.dataset.v) }));
+    if (plan && plan.blind && plan.blind.comp !== v) tip(t('blind.compNo', { name: t('bc.' + v) }));
   };
-  for (const k of BLIND_LOOKS) chip(q('#bLook'), k.id, t('bl.' + k.id));
-  q('#bLook').onclick = e => { const b = e.target.closest('button'); if (b && st.blind){ const s = { ...(st.blind.seeds || {}) }; for (const k of ['look', 'fx', 'post']) s[k] = blindSeed(); go({ look: b.dataset.v, fx: undefined, post: undefined, seeds: s }); } };      // 点第二下：同一种气氛，换一张底
-  for (const src of ['first', 'cn', 'jp', 'intl']){
-    const h = document.createElement('div'); h.className = 'sub'; h.textContent = t('blind.pal_' + src); const r = document.createElement('div'); r.className = 'pals'; q('#bPals').append(h, r);
-    for (const p of B_PALETTES.filter(p => p.src === src)){ const b = chip(r, p.id, ''); b.title = p.name; for (const k of ['g', 'i', 'a', 'b']){ const i = document.createElement('i'); i.style.background = p[k]; if (k === 'g') i.style.flex = '2'; b.append(i); } }
-  }
+  q('#bLook').onclick = e => {
+    const b = e.target.closest('button'); if (!b || !st.blind) return;
+    const v = b.dataset.v === 're' ? lookNow : b.dataset.v, s = { ...(st.blind.seeds || {}) }; if (!v) return;
+    if (v === lookNow) for (const k of ['look', 'fx', 'post']) s[k] = blindSeed();      // 点第二下：同一种气氛，换一张底
+    go({ look: v, fx: undefined, post: undefined, seeds: s });
+  };
+  const buildPals = src => { const r = q('#bPals'); r.textContent = ''; for (const p of B_PALETTES.filter(p => p.src === src)){ const b = chip(r, p.id, ''); b.title = p.name; for (const k of ['g', 'i', 'a', 'b']){ const i = document.createElement('i'); i.style.background = p[k]; if (k === 'g') i.style.flex = '2'; b.append(i); } } mark('#bPalG', src); if (plan && plan.blind) press('#bPals', v => v === plan.blind.pal.id); };
+  tabsOf('#bPalG', ['first', 'cn', 'jp', 'intl'].map(g => [g, t('blind.pal1_' + g)]), null, g => buildPals(g));
   q('#bPals').onclick = e => { const b = e.target.closest('button'); if (b && st.blind) go({ pal: { ...B_PALETTES.find(p => p.id === b.dataset.v) } }); };
   q('#bTune').onclick = () => { if (st.blind) go({ pal: bTune(bRng(blindSeed()).rnd) }); };
   mask.querySelectorAll('#bFour input').forEach(inp => inp.oninput = () => {
@@ -268,11 +250,11 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     if (inp.dataset.k === 'g'){ pal.paper = undefined; pal.light = undefined; }      // 换了底色，就不再铺那张纸
     go({ pal }, 'pal' + inp.dataset.k);
   });
-  q('#bLock').onclick = e => {
+  mask.querySelectorAll('.bLock').forEach(box => box.onclick = e => {
     const b = e.target.closest('button'); if (!b || !st.blind) return;
     const own = { ...(st.blind.own || {}) }; own[b.dataset.k] = !own[b.dataset.k];
     go({ own, ...(b.dataset.k !== 'font' ? { pal: undefined } : {}) });
-  };
+  });
   chip(q('#bFx'), '', t('blind.none')); for (const f of B_FX_MAIN) chip(q('#bFx'), f, t('bf.' + f));
   for (const f of B_FX_ORDER) if (!B_FX_MAIN.includes(f)) chip(q('#bFx2'), f, t('bf.' + f));
   chip(q('#bPost'), '', t('blind.none')); for (const p of B_POST_MAIN.concat(B_POST_ORDER.filter(p => !B_POST_MAIN.includes(p)))) chip(q('#bPost'), p, t('bp.' + p));
@@ -326,7 +308,7 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     ov.onpointerdown = e => {
       if (e.target.tagName === 'U') return;
       const [x, y] = pos(e), size = e.target.dataset.h === 'size';
-      if (!size){ sel = hit(x, y); refreshOne(); overlay(); if (!sel) return; openTab('box'); }
+      if (!size){ sel = hit(x, y); refreshOne(); overlay(); if (!sel) return; q('#pbody').scrollTop = 0; }
       e.preventDefault(); ov.setPointerCapture(e.pointerId); ov.focus({ preventScroll: true });
       const layer = sel.kind === 'layer', from = layer ? { dx: 0, dy: 0, k: 1, ...((st.blind.move || {})[sel.i] || {}) } : { ...items()[sel.i] };
       const r = selRect(), c = r ? [r.x + r.w / 2, r.y + r.h / 2] : [plan.W / 2, plan.H / 2];
@@ -393,31 +375,48 @@ function mountBlind({ resume, mask, st, draw, repaint, sync, alive, tip, keep, k
     // 🔒 拆出来就钉住方案和主角：之后改样式、改颜色，这张脸不会换
     if (on && plan.blind.pin && (!st.blind.comp || !st.blind.look || (!st.blind.hero && plan.blind.pin.hero))){ const was = st.blind; st.blind = { ...was, comp: was.comp || plan.blind.pin.comp, look: was.look || plan.blind.pin.look, hero: was.hero || plan.blind.pin.hero, word: was.word || plan.blind.pin.word }; if (box()){ const k = box().hist.indexOf(was); if (k >= 0) box().hist[k] = st.blind; } }
     q('#bGo').textContent = on ? t('blind.again') : t('blind.open');
-    for (const id of ['#bPrev', '#bNext', '#bEdit', '#bKeep', '#bOff', '#bName']) q(id).hidden = !on;
-    const tab = q('#tabs button[data-v="box"]'); tab.hidden = !on;
-    if (!on){ label = ''; sel = null; ov = null; if (tab.getAttribute('aria-pressed') === 'true') openTab('text'); return; }
+    if (!on){ label = ''; sel = null; ov = null; q('#bName').textContent = ''; for (const id of ['#bPrev', '#bNext', '#bUndo', '#bRedo', '#bKeep']) q(id).disabled = true; thumbs(); return; }
     if (!box() || !box().hist.includes(st.blind)){ boxes.push({ hist: [st.blind], i: 0 }); at = boxes.length - 1; }       // 从收藏里点回来的
     const b = box();
     q('#bPrev').disabled = at <= 0; q('#bNext').disabled = at >= boxes.length - 1;
-    q('#bUndo').disabled = b.i <= 0; q('#bRedo').disabled = b.i >= b.hist.length - 1;
-    const n = plan.blind.name; label = n.comp; lookNow = n.look;
-    q('#bNow_comp').textContent = t('bc.' + n.comp); q('#bNow_look').textContent = t('bl.' + n.look); q('#bNow_fx').textContent = n.fx.map(f => t('bf.' + f)).join(' '); q('#bNow_post').textContent = n.post.map(f => t('bp.' + f)).join(' '); q('#bNow_add').textContent = n.scene.map(f => t('bs.' + f)).join(' ');
+    q('#bUndo').disabled = b.i <= 0; q('#bRedo').disabled = b.i >= b.hist.length - 1; q('#bKeep').disabled = false;
+    const n = plan.blind.name, moved = label !== n.comp, aired = lookNow !== n.look; label = n.comp; lookNow = n.look;
+    if (moved || !q('#bComp').children.length){ const g = groups.find(x => x[0] === compG && x[1].some(c => c.id === n.comp)) || groups.find(x => x[1].some(c => c.id === n.comp)); if (g && (g[0] !== compG || !q('#bComp').children.length)) buildComp(g[0]); }      // 掷到别的堆里去了，跟过去
+    if (aired || !q('#bLook').children.length){ const g = B_LOOK_GROUPS.find(x => x[0] === lookG); if (!q('#bLook').children.length || (g[1] && !g[1].includes(n.look))) buildLook('all'); }
+    if (!q('#bPals').children.length) buildPals(['first', 'cn', 'jp', 'intl'].includes(plan.blind.pal.src) ? plan.blind.pal.src : 'first');
     short = t('bc.' + n.comp) + ' · ' + t('bl.' + n.look);
     name = [short].concat(n.fx.map(f => t('bf.' + f)), n.post.map(f => t('bp.' + f)), n.scene.map(s => t('bs.' + s))).join(' · ');
     q('#bName').textContent = name;
     const own = st.blind.own || {}, B = plan.blind.B, pal = plan.blind.pal;
-    mask.querySelectorAll('.bx .amts .fs').forEach(d => { const v = Math.round(100 * ((st.blind.amt || {})[d.dataset.k] === undefined ? 1 : st.blind.amt[d.dataset.k])), i = d.querySelector('input'); if (+i.value !== v) i.value = v; d.lastElementChild.textContent = v + '%'; });
-    q('#bNow_pal').textContent = pal.src === 'tune' ? t('blind.tuned') : (pal.name || '');
+    mask.querySelectorAll('.amts').forEach(d => { const v = Math.round(100 * ((st.blind.amt || {})[d.dataset.k] === undefined ? 1 : st.blind.amt[d.dataset.k])), i = d.querySelector('input'); if (+i.value !== v) i.value = v; d.lastElementChild.textContent = v + '%'; });
     press('#bComp', v => v === n.comp); press('#bLook', v => v === n.look); press('#bFx', v => v ? n.fx.includes(v) : !n.fx.length); press('#bFx2', v => n.fx.includes(v)); press('#bPost', v => v ? B.post.includes(v) : !B.post.length);
-    press('#bPals', v => v === pal.id); press('#bLock', v => !!own[v]);
+    press('#bPals', v => v === pal.id); mask.querySelectorAll('.bLock button').forEach(b => b.setAttribute('aria-pressed', String(!!own[b.dataset.k])));
     const act = mask.getRootNode().activeElement;
     mask.querySelectorAll('#bFour input').forEach(i => { if (i !== act) i.value = bToHex(pal[i.dataset.k]); });
     if (!(act && act.type === 'color' && act.closest('#bDots'))) refreshOne();
-    overlay();
+    overlay(); thumbs();
+  }
+
+  // ── 小图 ────────────────────────────────────────────────────────
+  let drag0 = 0, thT = 0;
+  const th = mountThumbs({ alive, busy: () => typing() || Date.now() - drag0 < 260, view: () => (keptOpen() ? q('#keptPop') : q('#pbody')) });
+  mask.addEventListener('pointerdown', () => { drag0 = Date.now(); }, true); mask.addEventListener('pointermove', e => { if (e.buttons) drag0 = Date.now(); }, { passive: true });
+  // 先让海报画完、人的手停下来，再说小图
+  function thumbs(){ clearTimeout(thT); thT = setTimeout(thumbsNow, 220); }
+  function thumbsNow(){
+    if (!alive()) return;
+    const { text, title } = texts(), jobs = [], has = !!(text.trim() || title.trim()), now = { ...st, text, title, pages: '1', noGround: false }, gen = o => JSON.stringify([text, title, now.headText, now.source, now.date, now.sourcePrefix, now.showHeader, now.showSource, now.showDate, now.orient, now.spans, now.titleSpans, now.font, now.latinFont, now.titleFont, now.paper, now.paperLight, now.ink, now.inkLight, loadedCustom.size, o]);
+    if (keptOpen() && has) for (const p of kept.list()){ const c = q(`#bKept .ti[data-id="${p.id}"] canvas`); if (!c) continue; const set = setOf(p), bl = p.style.blind; jobs.push({ cv: c, key: 'k' + p.id + gen([bl, set]), st: () => ({ ...now, ...set, blind: blindFor({ ...bl }, text, title) }) }); }
+    if (st.blind && plan && plan.blind && has){
+      const v = tab();
+      if (v === 'comp'){ const bl = { ...st.blind, comp: undefined, move: undefined, keep: undefined, items: undefined }, g = gen(bl); q('#bComp').querySelectorAll('button[data-v]').forEach(b => { const id = b.dataset.v, c = b.querySelector('canvas'); if (!c) return; jobs.push({ cv: c, key: 'c' + id + g, want: id, st: () => ({ ...now, blind: { ...bl, comp: id } }), tell: ok => { if (ok) delete b.parentElement.dataset.no; else b.parentElement.dataset.no = '1'; b.title = ok ? '' : t('blind.compNo', { name: t('bc.' + id) }); } }); }); }
+      if (v === 'look'){ const bl = { ...st.blind, look: undefined, fx: undefined, post: undefined }, g = gen(bl); q('#bLook').querySelectorAll('button[data-v]').forEach(b => { const id = b.dataset.v, c = b.querySelector('canvas'); if (!c) return; jobs.push({ cv: c, key: 'l' + id + g, st: () => ({ ...now, blind: { ...bl, look: id } }) }); }); }
+    }
+    th.set(jobs);
   }
   const editing = on => mask.classList.toggle('bedit', on);
   const drop = () => { if (!sel) return false; sel = null; refreshOne(); overlay(); return true; };
   refreshOne();
-  return { refresh, editing, drop, take, frozen: () => (plan && plan.blind && st.blind ? frozen() : st.blind), state: () => ({ boxes, at, open }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
+  return { refresh, editing, drop, take, on, off, thumbs, kick: () => th.kick(), dispose: () => { clearTimeout(thT); th.dispose(); }, frozen: () => (plan && plan.blind && st.blind ? frozen() : st.blind), state: () => ({ boxes, at }), own: k => { if (st.blind) set({ own: { ...(st.blind.own || {}), [k]: true }, ...(k === 'font' ? {} : { pal: undefined }) }); } };
 }
 

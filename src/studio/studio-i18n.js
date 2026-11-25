@@ -19,16 +19,21 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': '摘',
     'app.title': '拾 句',
-    'lang.toggle': '界面换成英文',
     'blind.amt_fx': '效果浓度', 'blind.amt_post': '修图浓度',
     'full.on': '全屏', 'full.off': '退出全屏', 'full.show': '面板', 'full.hide': '收起面板', 'full.title': '铺满整块屏，整张看得见',
     'theme.auto': '跟随', 'theme.day': '白天', 'theme.night': '黑夜',
     'tab.text': '文', 'tab.paper': '纸', 'tab.font': '字', 'tab.ink': '色', 'tab.layout': '版',
-    'act.save': '存 图', 'act.copy': '复制这张', 'act.close': '关闭',
+    'tab.comp': '方案', 'tab.look': '气氛', 'tab.pal': '颜色', 'tab.feel': '质感', 'tab.add': '添',
+    'mode.plain': '排信纸', 'mode.box': '拆盲盒', 'head.more': '更多', 'head.theme': '面板', 'head.lang': '语言', 'head.grab': '拉高、收起',
+    'blind.mineShort': '常用', 'blind.mineTitle': '常用版式', 'blind.mineNone': '还没有。拆到喜欢的，点海报底下那颗心。', 'blind.again1': '另掷一张', 'blind.amt': '浓度', 'blind.fourSub': '四样分开改', 'blind.addNow': '现在有的',
+    'blind.minePaper': '用我的纸', 'blind.mineInk': '用我的墨', 'blind.usePaper': '铺我选的这张', 'blind.useInk': '用我选的这支',
+    'blind.k_all': '全部', 'blind.k_air': '光和空气', 'blind.k_tex': '质地', 'blind.k_lens': '镜头', 'blind.k_word': '字的变化', 'blind.k_print': '印刷',
+    'blind.pal1_first': '最初', 'blind.pal1_cn': '中国', 'blind.pal1_jp': '日本', 'blind.pal1_intl': '国际',
+    'font.tBody': '正文', 'font.tTitle': '标题', 'font.tLatin': '西文', 'font.missFold': '还有 {n} 款没装', 'font.addFold': '加一款字：文件、字体包、链接', 'font.whose': '这张盲盒的字', 'font.mineOn': '用我选的', 'act.bareShort': '透明底',
+    'act.save': '存 图', 'act.copy': '复制', 'act.close': '关闭',
     'act.store': '存',
 
     // ── 通用小件（开关 / 字重 / 对齐 / 排向）──────────────────────
-    'sw.show': '显示', 'sw.hide': '隐藏',
     'weight.regular': '常', 'weight.medium': '中', 'weight.bold': '粗',
     'align.left': '左', 'align.center': '中', 'align.right': '右',
     'dir.horizontal': '横排', 'dir.vertical': '竖排',
@@ -37,7 +42,6 @@ const STUDIO_I18N = {
 
     // ── 文 ───────────────────────────────────────────────────────
     'text.title': '标题',
-    'text.sizeWeight': '字号 · 字重',
     'text.titlePh': '留空就没有标题',
     'text.body': '内容',
     // ── 版式盲盒 ─────────────────────────────────────────────────
@@ -45,10 +49,9 @@ const STUDIO_I18N = {
     'blind.openTitle': '随机一套字体海报式的排版。内容一个字不动，不喜欢就再拆。',
     'blind.prev': '上一个', 'blind.next': '下一个',
     'blind.keep': '存为常用', 'blind.keepTitle': '存成常用版式：以后换一段字，一点就照这样排',
-    'blind.off': '合上盲盒',
-    'blind.lock': '用我的', 'blind.paper': '纸', 'blind.font': '字', 'blind.ink': '墨',
    
-    'blind.edit': '改一改', 'tab.box': '盒',
+   
+   
     'blind.editHint': '在纸上点中什么就能拖着走；右下角的圆点放大、转动，右上角的叉删掉。字块也能拖。',
     'blind.undo': '撤一步', 'blind.redo': '重做',
     'blind.reroll': '别的不动，只重掷这一样',
@@ -60,14 +63,14 @@ const STUDIO_I18N = {
     'blind.compNo': '这段字排不进「{name}」，先给你换了一种。',
     'blind.cg': '底', 'blind.ci': '墨', 'blind.ca': '点睛', 'blind.cb': '副色',
     'blind.none': '都不要',
-    'blind.pal_first': '最初', 'bl.first': '最初', 'bc.full': '满排', 'bc.stars': '散星', 'blind.pal_cn': '中国传统色', 'blind.pal_jp': '和田三造与日本传统色', 'blind.pal_intl': '国际与现代', 'blind.tune': '按配色理论现调一套', 'blind.tuned': '现调',
-    'blind.s_comp': '方案', 'blind.s_pal': '颜色', 'blind.s_fx': '字上的效果', 'blind.s_post': '修图', 'blind.s_add': '自己加图形和线',
+    'bl.first': '最初', 'bc.full': '满排', 'bc.stars': '散星', 'blind.tune': '按配色理论现调一套',
+    'blind.s_fx': '字上的效果', 'blind.s_post': '修图',
     'blind.q_quiet': '低声', 'blind.q_image': '字即图形', 'blind.q_loud': '响亮', 'blind.more': '更多',
     'blind.g_line': '线', 'blind.g_shape': '形状', 'blind.g_light': '光', 'blind.g_cover': '遮盖', 'blind.g_pane': '玻璃与马赛克',
     'blind.f_line': '单线', 'blind.f_yarn': '毛线', 'blind.m_sweep': '一笔', 'blind.m_coil': '打圈', 'blind.m_tie': '系住两个字', 'blind.m_orbit': '环绕',
     'blind.l_deco': '淡字',
-    'act.bare': '透明底（存成 PNG）', 'sw.on': '要', 'sw.off': '不要',
-    'blind.kept': '存好了：「{name}」。换一段字，点上面的「常用版式」就照它排；双击改名。',
+    'act.bare': '透明底（存成 PNG）',
+    'blind.kept': '存好了：「{name}」。换一段字，点上头的「♡ 常用」就照它排。',
     'blind.empty': '先写点字，才好拆。',
     'blind.coverNote': '字多，第一张是封面，全文在后面 {n} 张',
     'bc.banner': '横幅',
@@ -111,9 +114,9 @@ const STUDIO_I18N = {
     'bl.negative': '负片',
     'bl.subtitle': '字幕',
     'bl.flat': '平涂',
-    'blind.s_look': '气氛', 'blind.re_look': '气氛', 'blind.re_post': '修图', 'blind.q_warm': '有体温', 'blind.q_long': '长文',
+    'blind.re_look': '气氛', 'blind.re_post': '修图', 'blind.q_warm': '有体温', 'blind.q_long': '长文',
     'bc.folio': '一页书', 'bc.hung': '悬栏', 'bc.tiers': '段组', 'bc.theme': '主句', 'bc.voices': '两个声音', 'bc.center': '中轴', 'bc.initial': '首字', 'bc.cascade': '递降', 'bc.develop': '显影', 'bc.steps2': '错段', 'bc.aside': '边注', 'bc.silence': '静', 'bc.ledger': '条目', 'bc.swell': '起潮', 'bc.strophe': '分行',
-    'blind.mine': '常用版式 {n}', 'blind.mineUse': '照这个版式排现在这段字。双击改名。',
+    'blind.mineUse': '照这个版式排现在这段字。双击改名。',
     'bc.block': '满版', 'bc.vblock': '竖满版', 'bc.pack': '回旋', 'bc.steps': '骰子', 'bc.rain': '雨', 'bc.field': '字场',
     'bc.path': '一笔', 'bc.inline': '句中', 'bc.swiss': '网格', 'bc.pillar': '立柱', 'bc.skyline': '天际线', 'bc.ramp': '变奏',
     'bc.contour': '等高线', 'bc.overprint': '叠印', 'bc.cut': '错切', 'bc.shutter': '交错', 'bc.melt': '渐糊', 'bc.slit': '狭缝', 'bc.micro': '字中字',
@@ -187,9 +190,8 @@ const STUDIO_I18N = {
     'paper.autoInkSwapped': '这张纸太浓，黑字看不清，墨色替你换成了「{name}」——不喜欢就自己再挑。',
 
     // ── 字 ───────────────────────────────────────────────────────
-    'font.body': '正文字体',
-    'font.latin': '西文字体（只管字母和数字）',
-    'font.title': '标题字体',
+   
+   
     'font.sameAsBody': '同正文',
     'font.noneLatin': '不指定（跟着中文字体走）',
     'font.hintMissing': '没装',
@@ -243,7 +245,7 @@ const STUDIO_I18N = {
     'layout.pages': '拆成几张',
     'layout.pagesAuto': '自动',
     'layout.offset': '整块位移',
-    'layout.offsetHint': '在右边预览图上直接拖',
+    'layout.offsetHint': '在预览图上直接拖',
     'layout.offsetVal': '左右 {x} · 上下 {y}',
     'layout.offsetNone': '没挪过',
     'layout.offsetReset': '归位',
@@ -288,16 +290,21 @@ const STUDIO_I18N = {
     // ── 药丸 / 面板骨架 ──────────────────────────────────────────
     'pill.clip': 'Clip',
     'app.title': 'Shiju',
-    'lang.toggle': 'Switch the interface to Chinese',
     'blind.amt_fx': 'Effect', 'blind.amt_post': 'Finish',
     'full.on': 'Full screen', 'full.off': 'Exit full screen', 'full.show': 'Panel', 'full.hide': 'Hide panel', 'full.title': 'Fill the screen and see the whole sheet',
     'theme.auto': 'System', 'theme.day': 'Day', 'theme.night': 'Night',
     'tab.text': 'Text', 'tab.paper': 'Paper', 'tab.font': 'Type', 'tab.ink': 'Ink', 'tab.layout': 'Layout',
-    'act.save': 'Save', 'act.copy': 'Copy this one', 'act.close': 'Close',
+    'tab.comp': 'Form', 'tab.look': 'Mood', 'tab.pal': 'Colour', 'tab.feel': 'Feel', 'tab.add': 'Add',
+    'mode.plain': 'Letter', 'mode.box': 'Blind box', 'head.more': 'More', 'head.theme': 'Panel', 'head.lang': 'Language', 'head.grab': 'Raise or lower',
+    'blind.mineShort': 'Saved', 'blind.mineTitle': 'Saved layouts', 'blind.mineNone': 'None yet. When you like one, tap the heart under the sheet.', 'blind.again1': 'Another', 'blind.amt': 'Amount', 'blind.fourSub': 'One colour at a time', 'blind.addNow': 'On the sheet',
+    'blind.minePaper': 'My paper', 'blind.mineInk': 'My ink', 'blind.usePaper': 'Use the chosen paper', 'blind.useInk': 'Use the chosen ink',
+    'blind.k_all': 'All', 'blind.k_air': 'Light and air', 'blind.k_tex': 'Texture', 'blind.k_lens': 'Lens', 'blind.k_word': 'Letters', 'blind.k_print': 'Print',
+    'blind.pal1_first': 'First', 'blind.pal1_cn': 'Chinese', 'blind.pal1_jp': 'Japanese', 'blind.pal1_intl': 'International',
+    'font.tBody': 'Body', 'font.tTitle': 'Title', 'font.tLatin': 'Latin', 'font.missFold': '{n} not installed', 'font.addFold': 'Add a font: file, zip or link', 'font.whose': 'Fonts of this box', 'font.mineOn': 'Use mine', 'act.bareShort': 'Transparent',
+    'act.save': 'Save', 'act.copy': 'Copy', 'act.close': 'Close',
     'act.store': 'Save',
 
     // ── 通用小件（开关 / 字重 / 对齐 / 排向）──────────────────────
-    'sw.show': 'Show', 'sw.hide': 'Hide',
     'weight.regular': 'Regular', 'weight.medium': 'Medium', 'weight.bold': 'Bold',
     'align.left': 'Left', 'align.center': 'Center', 'align.right': 'Right',
     'dir.horizontal': 'Horizontal', 'dir.vertical': 'Vertical',
@@ -306,7 +313,6 @@ const STUDIO_I18N = {
 
     // ── 文 ───────────────────────────────────────────────────────
     'text.title': 'Title',
-    'text.sizeWeight': 'Size · weight',
     'text.titlePh': 'Leave empty for no title',
     'text.body': 'Body',
     // ── blind box ────────────────────────────────────────────────
@@ -314,10 +320,9 @@ const STUDIO_I18N = {
     'blind.openTitle': 'A random poster-style layout. Your words stay as they are; do not like it, open another.',
     'blind.prev': 'Previous', 'blind.next': 'Next',
     'blind.keep': 'Save layout', 'blind.keepTitle': 'Save it as one of your layouts and reuse it on any text',
-    'blind.off': 'Close the box',
-    'blind.lock': 'Use my', 'blind.paper': 'paper', 'blind.font': 'font', 'blind.ink': 'ink',
    
-    'blind.edit': 'Edit', 'tab.box': 'Box',
+   
+   
     'blind.editHint': 'Click anything on the sheet and drag it; the corner dot scales and turns it, the cross removes it. Text blocks move too.',
     'blind.undo': 'Undo', 'blind.redo': 'Redo',
     'blind.reroll': 'Re-roll only this, keep the rest',
@@ -329,14 +334,14 @@ const STUDIO_I18N = {
     'blind.compNo': 'This text does not fit “{name}”, so another layout was used.',
     'blind.cg': 'ground', 'blind.ci': 'ink', 'blind.ca': 'accent', 'blind.cb': 'second',
     'blind.none': 'None',
-    'blind.pal_first': 'The first ones', 'bl.first': 'The first', 'bc.full': 'Justified', 'bc.stars': 'Stars', 'blind.pal_cn': 'Traditional Chinese', 'blind.pal_jp': 'Sanzo Wada and traditional Japanese', 'blind.pal_intl': 'International and modern', 'blind.tune': 'Mix one by colour theory', 'blind.tuned': 'mixed',
-    'blind.s_comp': 'Layout', 'blind.s_pal': 'Colours', 'blind.s_fx': 'Effects on the text', 'blind.s_post': 'Retouch', 'blind.s_add': 'Add shapes yourself',
+    'bl.first': 'The first', 'bc.full': 'Justified', 'bc.stars': 'Stars', 'blind.tune': 'Mix one by colour theory',
+    'blind.s_fx': 'Effects on the text', 'blind.s_post': 'Retouch',
     'blind.q_quiet': 'Quiet', 'blind.q_image': 'Words as images', 'blind.q_loud': 'Loud', 'blind.more': 'More',
     'blind.g_line': 'Lines', 'blind.g_shape': 'Shapes', 'blind.g_light': 'Light', 'blind.g_cover': 'Covers', 'blind.g_pane': 'Glass and mosaic',
     'blind.f_line': 'plain', 'blind.f_yarn': 'yarn', 'blind.m_sweep': 'one sweep', 'blind.m_coil': 'coil', 'blind.m_tie': 'tie two words', 'blind.m_orbit': 'orbit',
     'blind.l_deco': 'Faint text',
-    'act.bare': 'Transparent (PNG)', 'sw.on': 'On', 'sw.off': 'Off',
-    'blind.kept': 'Saved “{name}”. Open “My layouts” above to use it on any text; double-click renames.',
+    'act.bare': 'Transparent (PNG)',
+    'blind.kept': 'Saved “{name}”. Open ♡ Saved above to use it on any text.',
     'blind.empty': 'Write something first.',
     'blind.coverNote': 'long text: page 1 is a cover, the full text follows on {n} page(s)',
     'bc.banner': 'Banner',
@@ -380,9 +385,9 @@ const STUDIO_I18N = {
     'bl.negative': 'Negative',
     'bl.subtitle': 'Subtitles',
     'bl.flat': 'Flat',
-    'blind.s_look': 'Atmosphere', 'blind.re_look': 'atmosphere', 'blind.re_post': 'finish', 'blind.q_warm': 'Warm', 'blind.q_long': 'Long text',
+    'blind.re_look': 'atmosphere', 'blind.re_post': 'finish', 'blind.q_warm': 'Warm', 'blind.q_long': 'Long text',
     'bc.folio': 'Folio', 'bc.hung': 'Hung columns', 'bc.tiers': 'Tiers', 'bc.theme': 'Theme line', 'bc.voices': 'Two voices', 'bc.center': 'Centre line', 'bc.initial': 'Initial', 'bc.cascade': 'Cascade', 'bc.develop': 'Developing', 'bc.steps2': 'Stepped', 'bc.aside': 'Marginalia', 'bc.silence': 'Silence', 'bc.ledger': 'Ledger', 'bc.swell': 'Swell', 'bc.strophe': 'Strophes',
-    'blind.mine': 'My layouts {n}', 'blind.mineUse': 'Lay out the current text this way. Double-click to rename.',
+    'blind.mineUse': 'Lay out the current text this way. Double-click to rename.',
     'bc.block': 'Full block', 'bc.vblock': 'Vertical block', 'bc.pack': 'Packed', 'bc.steps': 'Dice', 'bc.rain': 'Rain', 'bc.field': 'Field',
     'bc.path': 'One stroke', 'bc.inline': 'Mid-sentence', 'bc.swiss': 'Grid', 'bc.pillar': 'Pillar', 'bc.skyline': 'Skyline', 'bc.ramp': 'Variation',
     'bc.contour': 'Contours', 'bc.overprint': 'Overprint', 'bc.cut': 'Offset cut', 'bc.shutter': 'Shutter', 'bc.melt': 'Melt', 'bc.slit': 'Slit scan', 'bc.micro': 'Words in a word',
@@ -456,9 +461,8 @@ const STUDIO_I18N = {
     'paper.autoInkSwapped': 'This paper is too dark for black text, so the ink was switched to “{name}” — pick another if you prefer.',
 
     // ── 字 ───────────────────────────────────────────────────────
-    'font.body': 'Body font',
-    'font.latin': 'Latin font (letters and digits only)',
-    'font.title': 'Title font',
+   
+   
     'font.sameAsBody': 'Same as body',
     'font.noneLatin': 'None (follow the Chinese font)',
     'font.hintMissing': 'missing',

@@ -27,13 +27,8 @@ const CSS = `
       overflow:hidden;overscroll-behavior:contain}
 .mask[data-vv]{right:auto;bottom:auto;
       left:var(--vvl,0px);top:var(--vvt,0px);width:var(--vvw,100%);height:var(--vvh,100%)}
-/* max-height 跟着遮罩的实高走，不跟 vh —— vh 量的是「地址栏收起时」的大视口，
-   手机上永远比眼前这块屏高一截。 */
-.box{background:var(--bg);border-radius:8px;max-width:1240px;width:100%;max-height:100%;
-     display:flex;gap:18px;padding:18px;box-shadow:var(--shadow)}
-.side{width:308px;flex:0 0 308px;overflow:auto;overscroll-behavior:contain;padding-right:6px}
-.side h2{margin:0 0 2px;font-size:14px;letter-spacing:.16em;color:var(--fg)}
-.side p.h{margin:0 0 12px;font-size:11px;color:var(--dim)}
+/* 高跟着遮罩走，不跟 vh —— vh 量的是「地址栏收起时」的大视口，手机上永远比眼前这块屏高一截。 */
+.box{background:var(--bg);color:var(--fg);box-shadow:var(--shadow)}
 label{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.1em;
       color:var(--dim);margin:13px 0 5px}
 /* 🔴 这三条原本写的是「label .sw …」（这段 CSS 住在模板字符串里，注释别用反引号）
@@ -58,11 +53,6 @@ input[type=text]:disabled{opacity:.5}
 .inks button,.row button.sw2{position:relative;padding-left:22px}
 .inks i,.row button.sw2 i{position:absolute;left:6px;top:50%;transform:translateY(-50%);
      width:10px;height:10px;border-radius:50%;border:1px solid rgba(128,128,128,.35)}
-/* 分页标签：东西一多，平铺的按钮墙就没法看了，拆成几屏 */
-.tabs{display:flex;gap:2px;margin:12px 0 0;border-bottom:1px solid var(--line)}
-.tabs button{flex:1;padding:7px 2px;border:0;background:transparent;color:var(--dim);
-     font-size:12px;letter-spacing:.1em;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
-.tabs button[aria-pressed=true]{color:var(--fg);border-bottom-color:var(--on-bg)}
 .pane{display:none;padding-top:2px}
 .pane.on{display:block}
 /* 纸：直接看缩略图，比看名字快得多 */
@@ -92,11 +82,8 @@ input[type=text]:disabled{opacity:.5}
 .fs input[type=number]{width:62px;border:1px solid var(--line);border-radius:4px;padding:5px 6px;
      font:13px inherit;text-align:center;color:var(--fg);background:var(--field)}
 .fs .val{width:44px;text-align:right;font-size:11px;color:var(--dim)}
-.acts{display:flex;gap:8px;margin-top:14px}
-.acts button{flex:1;padding:10px;border:0;border-radius:4px;font-size:13px;letter-spacing:.14em;cursor:pointer}
 .save{background:var(--on-bg);color:var(--on-fg)}
 .copy{background:var(--soft);color:var(--fg)}
-.close{background:transparent;color:var(--dim);border:1px solid var(--line)!important}
 .tip{font-size:11px;color:var(--dim);min-height:30px;line-height:1.55;margin-top:8px}
 .view{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .count{font-size:11px;color:var(--dim);letter-spacing:.08em;flex:0 0 auto}
@@ -109,29 +96,16 @@ input[type=text]:disabled{opacity:.5}
 .pg canvas{display:block;max-width:100%;box-shadow:0 6px 20px rgba(0,0,0,.18);border-radius:2px;
        outline:2px solid transparent;outline-offset:3px;touch-action:pinch-zoom}
 .pg[aria-selected=true] canvas{outline-color:rgba(185,32,11,.7)}
+.pages[data-n="1"] .pg canvas{outline:0}
 .mask.bare .pg canvas{background:repeating-conic-gradient(#d9d9d9 0 25%,#f4f4f4 0 50%) 0 0/18px 18px}
 .pg span{position:absolute;left:6px;top:6px;background:rgba(18,16,14,.72);color:#faf8f4;
        font-size:10px;padding:1px 6px;border-radius:3px}
 
-/* 手机：左右分栏在窄屏上必死 —— 侧栏钉死 308px，预览区被挤成 0 宽，
-   实测 375px 视口下画布量出来就是 0×0（能操作，但一眼都看不见成品）。
-   改成上下叠：预览在上，控制在下。 */
 @media (max-width: 760px){
   .mask{padding:0}
-  .box{flex-direction:column;gap:10px;padding:12px;border-radius:0;
-       width:100%;height:100%;max-height:100%}
-  /* 55%：竖版卡片按屏宽铺开正好这么高，整张能一眼看全，不用滚。
-     原来写的是 55vh —— vh 认的是地址栏收起时的大视口，键盘一弹它比整个面板还高，
-     底下的控制区被挤成零；而 dvh 老内核不认，整条 height 被丢掉。都换成百分比，
-     一路跟着 .box → .mask → visual viewport。 */
-  .view{order:-1;flex:0 0 auto;max-height:55%;min-height:0}
-  .pages{padding:0;gap:8px}
-  .side{width:auto;flex:1 1 auto;padding-right:0}
-  .side h2{font-size:13px}
-  textarea{height:88px}
-  .acts button{padding:12px}
-  /* 手指按不准 24px 高的按钮。桌面上 29×24 够用，手机上把这几排撑开。 */
-  .tabs button{padding:11px 2px;font-size:13px}
+  .pages{gap:8px}
+  textarea{height:104px}
+  /* 手指按不准 24px 高的按钮 */
   .sw button{padding:10px 11px;font-size:11px}
   .row button{padding:10px 6px}
 }
@@ -149,7 +123,7 @@ function ui(){
   host = document.createElement('div');
   host.style.cssText = 'all:initial;position:static';
   root = host.attachShadow({ mode: 'open' });
-  const st = document.createElement('style'); st.textContent = CSS + PICK_CSS + BLIND_CSS + FULL_CSS; root.append(st);
+  const st = document.createElement('style'); st.textContent = CSS + PICK_CSS + BLIND_CSS + FULL_CSS + FRAME_CSS; root.append(st);
   document.documentElement.append(host);
   pill = null;
 }
@@ -251,89 +225,75 @@ function openPanel(text, init = {}){
     mask.classList.toggle('night', night);
   };
 
-  mask = document.createElement('div'); mask.className = 'mask';
+  mask = document.createElement('div'); mask.className = 'mask'; mask.dataset.mode = st.blind ? 'box' : 'plain';
   // 本代面板的身份证：关掉或被新面板顶替后，这一代遗留的异步回调
   // （字体装载、纸解码、聚焦定时器、主题监听）一律安静退场，不再摸已空的 mask。
   const thisMask = mask;
   const alive = () => mask === thisMask;
   mask.innerHTML = `
     <div class="box">
+      ${headHtml(init)}
+      <div class="tabs" id="tabs">${tabsHtml()}</div>
       <div class="side">
-        <h2>${t('app.title')}<span class="sw" id="lang" style="float:right;margin-left:6px${hostLocale(init.locale) ? ';display:none' : ''}"><button title="${t('lang.toggle')}" aria-label="${t('lang.toggle')}">${studioLocale === 'en' ? '中' : 'EN'}</button></span><span class="sw" id="theme" style="float:right">
-          <button data-v="auto">${t('theme.auto')}</button><button data-v="day">${t('theme.day')}</button><button data-v="night">${t('theme.night')}</button>
-        </span></h2><p class="h" id="tag"></p>
-
-        <div class="tabs" id="tabs">
-          <button data-v="text">${t('tab.text')}</button><button data-v="paper">${t('tab.paper')}</button>
-          <button data-v="font">${t('tab.font')}</button><button data-v="ink">${t('tab.ink')}</button>
-          <button data-v="layout">${t('tab.layout')}</button>
-          <button data-v="box" hidden>${t('tab.box')}</button>
-        </div>
-
+        <button class="grab" id="grab" aria-label="${t('head.grab')}"></button>
+        <div class="pbody" id="pbody">
+        ${blindOneHtml()}
         <div class="pane" data-p="text">
-          <label>${t('text.title')}<span class="sw"><span style="font-size:10px">${t('text.sizeWeight')}</span></span></label>
-          <input type="text" id="ti" placeholder="${t('text.titlePh')}">
-          <div class="fs" style="margin-top:6px">
-            <input type="range" id="ts" min="20" max="140" step="1">
-            <input type="number" id="tsn" min="12" max="300" step="1">
-            <span class="sw" id="tw">
-              <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
-          </div>
-          <label>${t('text.body')}<span class="sw"><span style="font-size:10px">${t('text.sizeWeight')}</span></span></label>
+          <label>${t('text.body')}</label>
           <div class="ta"><div class="bk" aria-hidden="true"><div></div></div><textarea id="t"></textarea></div>
           ${pickHtml()}
           <p class="pkhint" id="pkHint">&nbsp;<button id="pkReset" hidden>${t('pick.reset')}</button></p>
-          <div class="fs" style="margin-top:6px">
+          <div class="fs pl" style="margin-top:6px">
             <input type="range" id="fs" min="20" max="96" step="1">
             <input type="number" id="fsn" min="12" max="200" step="1">
             <span class="sw" id="weight">
               <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
           </div>
-          <label>${t('text.source')}<span class="sw" id="swSrc">
-            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
-          <div class="fs">
-            <input type="text" id="sp" placeholder="${t('text.sourcePrefixPh')}" style="width:64px;padding:5px 6px;font-size:12px">
-            <input type="text" id="s" style="flex:1">
+          <label>${t('text.title')}</label>
+          <input type="text" id="ti" placeholder="${t('text.titlePh')}">
+          <div class="fs pl" style="margin-top:6px">
+            <input type="range" id="ts" min="20" max="140" step="1">
+            <input type="number" id="tsn" min="12" max="300" step="1">
+            <span class="sw" id="tw">
+              <button data-v="0">${t('weight.regular')}</button><button data-v="1">${t('weight.medium')}</button><button data-v="2">${t('weight.bold')}</button></span>
           </div>
-          <label>${t('text.date')}<span class="sw" id="swDate">
-            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
-          <input type="text" id="d">
-          <label>${t('text.header')}<span class="sw" id="swHead">
-            <button data-v="1">${t('sw.show')}</button><button data-v="0">${t('sw.hide')}</button></span></label>
-          <input type="text" id="hd" placeholder="${t('text.headerPh')}">
-          <label>${t('text.rules')}</label>
-          <div class="row">
-            <button id="rHead" style="flex:1">${t('text.ruleHead')}</button>
-            <button id="rTitle" style="flex:1">${t('text.ruleTitle')}</button>
-            <button id="rFoot" style="flex:1">${t('text.ruleFoot')}</button>
+          <div class="rws">
+            <div class="rw"><span>${t('text.source')}</span><input type="text" class="mini" id="sp" placeholder="${t('text.sourcePrefixPh')}"><input type="text" id="s"><button class="tg" id="swSrc" aria-label="${t('text.source')}"><u></u></button></div>
+            <div class="rw"><span>${t('text.date')}</span><input type="text" id="d"><button class="tg" id="swDate" aria-label="${t('text.date')}"><u></u></button></div>
+            <div class="rw"><span>${t('text.header')}</span><input type="text" id="hd" placeholder="${t('text.headerPh')}"><button class="tg" id="swHead" aria-label="${t('text.header')}"><u></u></button></div>
           </div>
+          <div class="bx" id="orientIn"></div>
         </div>
 
-        <div class="pane" data-p="paper">
+        <div class="pane" data-p="paper"><div id="paperHome"><div id="paperBox">
           <div class="sub">${t('paper.builtin')}</div><div class="grid" id="paperBuiltin"></div>
           <div class="sub" id="packHd">${t('paper.pack')}</div><div class="grid" id="paperPack"></div>
           <div class="sub">${t('paper.mine')}</div><div class="grid" id="paperMine"></div>
           <label>${t('paper.bright')}</label>
           <div class="fs"><input type="range" id="pl" min="-50" max="50" step="1">
             <span class="val" id="plv"></span></div>
-        </div>
+        </div></div></div>
 
         <div class="pane" data-p="font">
-          <div class="sub">${t('font.body')}</div><div class="flist" id="font"></div>
-          <div id="flBox"${init.fontUrls ? ' hidden' : ''}><div class="fs" style="margin-top:6px">
-            <input type="text" id="fl" placeholder="${t('font.linkPh')}" aria-label="${t('font.linkPh')}" style="flex:1;padding:5px 7px;font-size:12px">
-            <button id="flGo" style="padding:6px 9px;border:1px solid var(--line);
-                    background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('font.linkGo')}</button>
-          </div>
-          <p class="pkhint">${t('font.linkHint')}</p></div>
-          <div class="sub">${t('font.latin')}</div><div class="flist" id="latin"></div>
-          <div class="sub">${t('font.title')}</div><div class="flist" id="swTitleFont"></div>
+          <div class="bx" style="margin-bottom:14px"><div class="sub">${t('font.whose')}</div><div class="chips"><span class="bLock"><button data-k="font">${t('font.mineOn')}</button></span><span class="bre" data-ks="font"></span></div></div>
+          <div class="ctr"><span class="seg" id="fTgt"><button data-v="font" aria-pressed="true">${t('font.tBody')}</button><button data-v="swTitleFont" aria-pressed="false">${t('font.tTitle')}</button><button data-v="latin" aria-pressed="false">${t('font.tLatin')}</button></span></div>
+          <div class="flist" id="font"></div>
+          <div class="flist" id="swTitleFont" hidden></div>
+          <div class="flist" id="latin" hidden></div>
+          <details class="fold" id="fMiss"><summary><span id="fMissN"></span></summary><div class="flist" id="fontMiss"></div></details>
+          <details class="fold" id="fAdd"><summary>${t('font.addFold')}</summary>
+            <div class="flist" id="fontAdd"></div>
+            <div id="flBox"${init.fontUrls ? ' hidden' : ''}><div class="fs" style="margin-top:6px">
+              <input type="text" id="fl" placeholder="${t('font.linkPh')}" aria-label="${t('font.linkPh')}" style="flex:1;padding:5px 7px;font-size:12px">
+              <button id="flGo" style="padding:6px 9px;border:1px solid var(--line);
+                      background:var(--btn);color:var(--fg);border-radius:4px;cursor:pointer;font-size:12px">${t('font.linkGo')}</button>
+            </div>
+            <p class="pkhint">${t('font.linkHint')}</p></div>
+          </details>
         </div>
 
-        <div class="pane" data-p="ink">
+        <div class="pane" data-p="ink"><div id="inkHome"><div id="inkBox">
           <label>${t('ink.body')}</label><div class="row inks" id="ink"></div>
-          <label>${t('ink.meta')}</label><div class="row inks" id="metaInk"></div>
-          <label>${t('ink.quote')}</label><div class="row inks" id="quoteInk"></div>
           <label>${t('ink.custom')}<span class="sw"><span style="font-size:10px">${t('ink.customHint')}</span></span></label>
           <div class="fs">
             <input type="color" id="ck">
@@ -345,6 +305,9 @@ function openPanel(text, init = {}){
           <label>${t('ink.bright')}</label>
           <div class="fs"><input type="range" id="il" min="-50" max="50" step="1">
             <span class="val" id="ilv"></span></div>
+          </div></div>
+          <label>${t('ink.meta')}</label><div class="row inks" id="metaInk"></div>
+          <label>${t('ink.quote')}</label><div class="row inks" id="quoteInk"></div>
         </div>
 
         <div class="pane" data-p="layout">
@@ -362,8 +325,14 @@ function openPanel(text, init = {}){
             <button data-v="0">${t('dir.horizontal')}</button><button data-v="1">${t('dir.vertical')}</button></span></label>
           <label>${t('layout.bodyAlign')}</label><div class="row" id="align"></div>
           <label>${t('layout.titleAlign')}</label><div class="row" id="talign"></div>
-          <label>${t('layout.orient')}</label><div class="row" id="orient"></div>
+          <div id="orientHome"><div id="orientBox"><label>${t('layout.orient')}</label><div class="row" id="orient"></div></div></div>
           <label>${t('layout.pages')}</label><div class="row" id="pagesRow"></div>
+          <label>${t('text.rules')}</label>
+          <div class="row">
+            <button id="rHead" style="flex:1">${t('text.ruleHead')}</button>
+            <button id="rTitle" style="flex:1">${t('text.ruleTitle')}</button>
+            <button id="rFoot" style="flex:1">${t('text.ruleFoot')}</button>
+          </div>
           <label>${t('layout.offset')}<span class="sw"><span style="font-size:10px">${t('layout.offsetHint')}</span></span></label>
           <div class="fs">
             <span class="val" id="offv" style="width:auto"></span>
@@ -373,19 +342,20 @@ function openPanel(text, init = {}){
         </div>
 
         ${blindPaneHtml()}
-        <label style="margin:14px 0 -6px">${t('act.bare')}<span class="sw" id="bare"><button data-v="0">${t('sw.off')}</button><button data-v="1">${t('sw.on')}</button></span></label>
-        <div class="acts">
+        </div>
+        <div class="foot">
           <button class="save" id="save">${t('act.save')}</button>
           <button class="copy" id="copy">${t('act.copy')}</button>
+          <button class="tg" id="bare" title="${t('act.bare')}"><u></u>${t('act.bareShort')}</button>
         </div>
-        <div class="acts"><button class="close" id="close">${t('act.close')}</button></div>
-        <div class="tip" id="tip"></div>
       </div>
       <div class="view">
-        ${blindHtml()}
-        ${fullHtml()}
+        <div class="count" id="count"></div>
         <div class="pages" id="pgs"></div>
+        ${barHtml()}
+        <div class="tip" id="tip"></div>
       </div>
+      ${popsHtml(init)}
     </div>`;
   vvStop = trackViewport(mask);
   root.append(mask);
@@ -401,7 +371,7 @@ function openPanel(text, init = {}){
 
   // ── 画 ──────────────────────────────────────────────────────────
   let warmFor = null;
-  let plan = null, dragging = false, blindBar = null, full = null;
+  let plan = null, dragging = false, blindBar = null, full = null, frame = null;
   // 盲盒里自己挑了纸 / 字 / 墨，那一样就归自己，别的照旧听种子的
   const ownIt = k => { if (blindBar) blindBar.own(k); };
   // 拖的时候只重画已有的画布，绝不重建 DOM ——
@@ -478,7 +448,7 @@ function openPanel(text, init = {}){
         wrapEl.onclick = () => { selected = i; markSel(); };
         box.append(wrapEl); pageCanvases.push(cv);
       });
-      { const cols = Math.min(plan.pages.length, 3), rows = Math.ceil(plan.pages.length / cols); mask.style.setProperty('--need', `calc((100vw - 24px) * ${(plan.H / plan.W / cols * rows).toFixed(4)})`); }
+      box.dataset.n = plan.pages.length;
       if (selected >= plan.pages.length) selected = plan.pages.length - 1;
       markSel();
       // 张数、尺寸、以及「没照你说的办」的时候必须说出来，不能默默给个别的结果
@@ -492,19 +462,23 @@ function openPanel(text, init = {}){
       q('#count').textContent =
         t('count.pages', { n: plan.pages.length, w: plan.W, h: plan.H, ew: plan.W*DPR, eh: plan.H*DPR })
         + (notes.length ? t('count.notesGlue') + notes.join(t('count.notesJoin')) : '');
+      if (notes.length) q('#count').dataset.note = '1'; else delete q('#count').dataset.note;
+      mask.style.setProperty('--ar', (S0.w / S0.h).toFixed(3));
       // 盲盒可能抽中一张还没解码完的信纸：先垫纯色，解完再画一次
       if (plan.blind && plan.blind.pal.paper){
         const im = groundPhoto({ paper: plan.blind.pal.paper, orient: st.orient });
         if (im && !im.complete) im.addEventListener('load', draw, { once: true });
       }
       if (blindBar) blindBar.refresh(plan);
+      if (frame) frame.setMode(st.blind ? 'box' : 'plain');
       if (rough) fineSoon();
       prime(); if (warmFor !== st.title + st.text){ warmFor = st.title + st.text; prewarm(); }
     } catch (e){ tipEl.textContent = t('count.renderFail', { msg: e.message }); }
   };
   // 打字的时候盲盒别一字一画（一张要一两百毫秒），停手再画
   let typingTimer;
-  const drawTyping = () => { clearTimeout(typingTimer); if (st.blind) typingTimer = setTimeout(draw, 240); else draw(); };
+  let typedAt = 0;
+  const drawTyping = () => { typedAt = Date.now(); clearTimeout(typingTimer); if (st.blind) typingTimer = setTimeout(draw, 240); else draw(); };
   const markSel = () => mask.querySelectorAll('.pg').forEach(el =>
     el.setAttribute('aria-selected', +el.dataset.i === selected));
 
@@ -611,6 +585,7 @@ function openPanel(text, init = {}){
   function buildPresets(){
     const box = q('#presets'); box.textContent = '';
     for (const p of allPresets()){
+      if (p.style.blind) continue;      // 盲盒的在「♡ 常用」里
       const b = document.createElement('button');
       b.dataset.v = p.id; b.textContent = tName('preset', p.id, p.name);
       const mine = (cfg('presets') || []).some(x => x.id === p.id);
@@ -645,13 +620,6 @@ function openPanel(text, init = {}){
     tipEl.textContent = t('preset.saved', { name });
   };
 
-  // 标签页
-  q('#tabs').addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    mask.querySelectorAll('#tabs button').forEach(x => x.setAttribute('aria-pressed', x === b));
-    mask.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.p === b.dataset.v));
-    if (blindBar) blindBar.editing(b.dataset.v === 'box');
-  });
   q('#tw').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     st.titleWeight = +b.dataset.v; setCfg('titleWeight', st.titleWeight); sync(); draw();
@@ -667,19 +635,16 @@ function openPanel(text, init = {}){
   });
 
   q('#lang').onclick = e => {
-    if (!e.target.closest('button')) return;
-    const { resume, ...rest } = init, tab = mask.querySelector('#tabs button[aria-pressed=true]');
+    const b = e.target.closest('button'); if (!b || b.dataset.v === (studioLocale === 'en' ? 'en' : 'zh-CN')) return;
+    const { resume, ...rest } = init;
     Object.assign(st, { text: q('#t').value, title: q('#ti').value, source: q('#s').value, date: q('#d').value, headText: q('#hd').value, sourcePrefix: q('#sp').value });
-    setCfg('uiLang', studioLocale === 'en' ? 'zh-CN' : 'en');
-    document.removeEventListener('keydown', esc); pick.dispose(); full.dispose(); clearTimeout(fineTimer); clearTimeout(typingTimer);
-    openPanel(st.text, { ...rest, resume: { st, tab: tab ? tab.dataset.v : 'text', blind: blindBar.state(), full: full.state() } });
+    setCfg('uiLang', b.dataset.v);
+    document.removeEventListener('keydown', esc); pick.dispose(); full.dispose(); frame.dispose(); blindBar.dispose(); clearTimeout(fineTimer); clearTimeout(typingTimer);
+    openPanel(st.text, { ...rest, resume: { st, frame: frame.state(), blind: blindBar.state(), full: full.state() } });
   };
 
-  const mkSwitch = (sel, key) => q(sel).addEventListener('click', e => {
-    const b = e.target.closest('button'); if (!b) return;
-    st[key] = b.dataset.v === '1'; setCfg(key, st[key]); sync(); draw();
-  });
-  mkSwitch('#swSrc', 'showSource'); mkSwitch('#swDate', 'showDate'); mkSwitch('#swHead', 'showHeader');
+  for (const [sel, key] of [['#swSrc', 'showSource'], ['#swDate', 'showDate'], ['#swHead', 'showHeader']])
+    q(sel).onclick = () => { st[key] = !st[key]; setCfg(key, st[key]); sync(); draw(); };
   // 三道线：按钮本身就是开关，亮着＝要
   for (const [sel, key] of [['#rHead','headRule'], ['#rTitle','titleRule'], ['#rFoot','footRule']]){
     q(sel).onclick = () => { st[key] = !st[key]; setCfg(key, st[key]); sync(); draw(); };
@@ -866,13 +831,14 @@ function openPanel(text, init = {}){
   };
   function buildFonts(){
     // 正文字体
-    const box = q('#font'); box.textContent = '';
+    const box = q('#font'), miss = q('#fontMiss'); box.textContent = ''; miss.textContent = '';
     for (const f of FONTS){
       const ok = fontAvailable(f);
       const b = fontRow(f.id, tName('font', f.id, f.name), ok ? cjkStack(f.id) : null, ok ? '' : t('font.hintMissing'), !ok);
       if (!ok) b.title = t('font.missingTitle');
-      box.append(b);
+      (ok ? box : miss).append(b);
     }
+    q('#fMissN').textContent = t('font.missFold', { n: miss.children.length }); q('#fMiss').hidden = !miss.children.length;
     for (const f of cfg('myFonts')){
       const away = f.idb && !loadedCustom.has(f.id), b = fontRow(f.id, f.name, `"${f.id}"`, f.faces ? t('font.hintLink') : away ? t('font.hintAway') : t('font.hintCustom'), away);
       b.title = t('tip.rightDelete');
@@ -917,7 +883,7 @@ function openPanel(text, init = {}){
     // 标题字体：中文和英文都能挑（挑了英文字，汉字会自动落回正文的中文字体）
     fillFonts(q('#swTitleFont'), t('font.sameAsBody'), false);
 
-    const add = document.createElement('button');
+    const add = document.createElement('button'); q('#fontAdd').textContent = '';
     add.textContent = t('font.add'); add.style.fontSize = '12px';
     add.title = t('font.addTitle');
     add.onclick = async () => {
@@ -928,22 +894,24 @@ function openPanel(text, init = {}){
       for (const f of files){ tipEl.textContent = t('font.reading', { name: f.name }); try { got.push(...await fontFromBytes(f.name, await readFile(f), askFonts)); } catch (e){ bad.push(fontSay(e, f.name)); } }
       fontDone(got, bad);
     };
-    box.append(add);
-
-    const pickFont = (el, key) => el.addEventListener('click', e => {
-      const b = e.target.closest('button'); if (!b || !b.dataset.v) return;
-      if (b.dataset.off === '1'){
-        tipEl.textContent = t('font.notInstalledTip');
-        return;
-      }
-      st[key] = b.dataset.v; setCfg(key, st[key]); ownIt('font'); sync(); draw();
-    });
-    pickFont(box, 'font'); pickFont(q('#latin'), 'latinFont'); pickFont(q('#swTitleFont'), 'titleFont');
+    q('#fontAdd').append(add);
   }
+  // 监听只挂一回：单子会重建很多次，跟着重挂的话点一下要画好几遍
+  for (const [sel, key] of [['#font', 'font'], ['#latin', 'latinFont'], ['#swTitleFont', 'titleFont']]) q(sel).addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || !b.dataset.v) return;
+    if (b.dataset.off === '1'){ tipEl.textContent = t('font.notInstalledTip'); return; }
+    st[key] = b.dataset.v; setCfg(key, st[key]); ownIt('font'); sync(); draw();
+  });
+  q('#fontMiss').onclick = () => { tipEl.textContent = t('font.notInstalledTip'); };
+  q('#fTgt').onclick = e => {
+    const b = e.target.closest('button'); if (!b) return;
+    q('#fTgt').querySelectorAll('button').forEach(x => { x.setAttribute('aria-pressed', String(x === b)); q('#' + x.dataset.v).hidden = x !== b; });
+    q('#fMiss').hidden = b.dataset.v !== 'font' || !q('#fontMiss').children.length;
+  };
 
-  q('#bare').addEventListener('click', e => { const b = e.target.closest('button'); if (b){ st.noGround = b.dataset.v === '1'; sync(); draw(); } });
+  q('#bare').onclick = () => { st.noGround = !st.noGround; sync(); draw(); };
   const sync = () => {
-    q('#bare').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.v === '1') === st.noGround));
+    for (const [sel, on] of [['#bare', st.noGround], ['#swSrc', st.showSource], ['#swDate', st.showDate], ['#swHead', st.showHeader]]) q(sel).setAttribute('aria-pressed', String(!!on));
     mask.classList.toggle('bare', st.noGround);
     pick.refresh();
     const marks = [['#orient', st.orient], ['#pagesRow', st.pages],
@@ -952,9 +920,7 @@ function openPanel(text, init = {}){
                    ['#align', st.align], ['#talign', st.titleAlign], ['#vert', st.vertical?'1':'0'], ['#tvert', st.titleVertical?'1':'0'],
                    ['#metaInk', st.metaInk],
                    ['#quoteInk', st.quoteInk],
-                   ['#latin', st.latinFont], ['#swTitleFont', st.titleFont], ['#tw', st.titleWeight],
-                   ['#swSrc', st.showSource?'1':'0'], ['#swDate', st.showDate?'1':'0'],
-                   ['#swHead', st.showHeader?'1':'0']];
+                   ['#latin', st.latinFont], ['#swTitleFont', st.titleFont], ['#tw', st.titleWeight]];
     for (const [sel, val] of marks)
       mask.querySelectorAll(sel + ' button').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === String(val)));
     q('#s').disabled = !st.showSource; q('#sp').disabled = !st.showSource;
@@ -1003,7 +969,7 @@ function openPanel(text, init = {}){
   q('#ti').oninput = e => { pick.edited('title', e); drawTyping(); };
   q('#s').oninput = drawTyping; q('#d').oninput = drawTyping;
   blindBar = mountBlind({ resume: back && back.blind, mask, st, draw, sync, alive, tip: m => { tipEl.textContent = m; },
-    openTab: v => { const b = q('#tabs button[data-v="' + v + '"]'); if (b.getAttribute('aria-pressed') !== 'true') b.click(); },
+    tab: () => frame ? frame.tab() : '', keptOpen: () => !q('#keptPop').hidden, shutPops: () => frame && frame.shut(), typing: () => Date.now() - typedAt < 700,
     // 拖着的时候只重画第一张，不重建预览（重建的话手底下那层会被销毁，拖动当场断掉）
     repaint: draft => {
       plan = planPages(st); if (!plan.blind || !pageCanvases[0]) return null;
@@ -1020,13 +986,20 @@ function openPanel(text, init = {}){
       setCfg('presets', (cfg('presets') || []).concat([{ id: 'ps' + Date.now(), name, style }]));
       buildPresets();
     } });
-  full = mountFull({ resume: back && back.full, mask, alive, tipEl, changed: () => fineSoon() });
+  full = mountFull({ resume: back && back.full, mask, alive, changed: () => fineSoon(), low: () => frame && frame.sheet('low') });
+  frame = mountFrame({ mask, alive, resume: back && back.frame,
+    moved: [['#orientBox', '#orientHome', '#orientIn'], ['#paperBox', '#paperHome', '#palPaper'], ['#inkBox', '#inkHome', '#palInk']],
+    onTab: (v, m) => { blindBar.editing(m === 'box' && v !== 'text'); blindBar.thumbs(); },
+    onMode: m => { tipEl.textContent = ''; if (m === 'plain') blindBar.off(); else blindBar.on(); } });
+  q('#pbody').addEventListener('scroll', () => blindBar.kick(), { passive: true });
+  q('#keptPop').addEventListener('scroll', () => blindBar.kick(), { passive: true });
+  q('#bMine').addEventListener('click', () => blindBar.thumbs());
   q('#hd').oninput = () => { setCfg('headText', q('#hd').value); drawTyping(); };
 
   const close = () => {
     // 自己的 Esc 监听无条件先摘：被新面板顶替后残留的那份也借这条路自清
     document.removeEventListener('keydown', esc);
-    pick.dispose(); full.dispose();
+    pick.dispose(); full.dispose(); frame.dispose(); blindBar.dispose();
     if (!alive()) return;
     fullLeave();
     if (vvStop) { vvStop(); vvStop = null; }
@@ -1041,7 +1014,7 @@ function openPanel(text, init = {}){
   mask.addEventListener('pointerdown', e => { downOnMask = e.target === mask; }, true);
   mask.onclick = e => { if (e.target === mask && downOnMask) close(); };
   // 正选着字的时候，Esc 先放开选中的字，再退全屏，再按一次才关面板
-  const esc = e => { if (e.key === 'Escape' && !(alive() && (pick.drop() || blindBar.drop() || full.drop()))) close(); };
+  const esc = e => { if (e.key === 'Escape' && !(alive() && (frame.shut() || pick.drop() || blindBar.drop() || full.drop()))) close(); };
   document.addEventListener('keydown', esc);
 
   // ── 存 / 复制 ───────────────────────────────────────────────────
@@ -1095,10 +1068,8 @@ function openPanel(text, init = {}){
 
   applyTheme();
   try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme); } catch {}
-  q('#tabs').querySelector('button').click();      // 默认落在「文」这一屏
-  if (back && back.tab !== 'box') q(`#tabs button[data-v="${back.tab}"]`).click();
+  frame.setMode(st.blind ? 'box' : 'plain');
   buildPapers(); buildFonts(); buildInks(); buildPresets(); sync(); draw();
-  if (back && back.tab === 'box' && st.blind) q('#tabs button[data-v="box"]').click();      // 「盒」那一屏要等盲盒画出来才有
   if (blank && !back) setTimeout(() => { if (alive()) q('#t').focus(); }, 60);   // 空手起稿，光标直接落在内容框
   ensureCustomFonts().then(() => { if (!alive()) return; dropFontProbes(); buildFonts(); sync(); draw(); prewarm(); });
   // 嵌入方捆的字（一款一二十兆）可能这会儿才下完：单子刷新；正拆着盲盒就不动那张脸

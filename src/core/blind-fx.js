@@ -10,7 +10,8 @@ function bCanvas(w, h){
   const i = bPool.findIndex(c => c.width === w && c.height === h);
   if (i >= 0){
     const c = bPool.splice(i, 1)[0], x = c.getContext('2d');
-    x.setTransform(1, 0, 0, 1, 0, 0);
+    if (x.reset){ x.reset(); if (x === bLastCtx) bLastRGB = -1; return c; }      // 连笔的状态一起清；颜色也回了黑，别当它还是上一种
+    x.setTransform(1, 0, 0, 1, 0, 0); x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'low';
     x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
     x.clearRect(0, 0, w, h);
     return c;

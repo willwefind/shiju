@@ -30,8 +30,8 @@ const PICK_CSS = `
 .pkf span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pkf i{font-style:normal;font-size:10px;color:var(--dim)}
 .pick .flist{margin-top:4px;max-height:216px;overflow:auto;overscroll-behavior:contain}
-.pkhint{font-size:10px;color:var(--dim);margin:5px 0 0;line-height:1.5}
-.pkhint button{border:0;background:transparent;color:var(--fg);font-size:10px;text-decoration:underline;cursor:pointer;padding:0 0 0 4px}
+.pkhint{font-size:11px;color:var(--dim);margin:5px 0 0;line-height:1.5}
+.pkhint button{border:0;background:transparent;color:var(--fg);font-size:11px;text-decoration:underline;cursor:pointer;padding:0 0 0 4px}
 @media (max-width: 760px){
   .pkinks button{width:28px;height:28px}
   .pkinks button.same{height:30px;padding:0 10px}
